@@ -1,0 +1,357 @@
+{
+  "title": "Transaction Management API Endpoints",
+  "description": "Create, retrieve, update, and delete transactions with receipt upload support",
+  "version": "1.0",
+  "base_url": "{BACKEND_URL}/api/transactions",
+  "authentication": "Bearer {accessToken} (JWT, required for all endpoints)",
+  "endpoints": [
+    {
+      "id": "transaction-list",
+      "path": "/api/transactions",
+      "method": "GET",
+      "description": "List transactions for authenticated user with optional filtering",
+      "query_parameters": {
+        "month": {
+          "type": "string (YYYY-MM)",
+          "required": true,
+          "example": "2025-05",
+          "description": "Filter transactions by month"
+        },
+        "categoryId": {
+          "type": "string (UUID)",
+          "required": false,
+          "description": "Optional filter by category ID"
+        },
+        "status": {
+          "type": "string",
+          "required": false,
+          "enum": ["PENDING", "PENDING_REVIEW", "CONFIRMED"],
+          "description": "Optional filter by transaction status"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "transactions": [
+            {
+              "transactionId": {
+                "type": "string (UUID)",
+                "example": "550e8400-e29b-41d4-a716-446655440001"
+              },
+              "categoryId": {
+                "type": "string (UUID)",
+                "example": "550e8400-e29b-41d4-a716-446655440002"
+              },
+              "amount": {
+                "type": "number (decimal 2)",
+                "example": -45.50,
+                "description": "Negative for PAYMENT, positive for DEPOSIT"
+              },
+              "type": {
+                "type": "string",
+                "enum": ["DEPOSIT", "PAYMENT"],
+                "example": "PAYMENT"
+              },
+              "merchantName": {
+                "type": "string",
+                "example": "Whole Foods Market"
+              },
+              "transactionDate": {
+                "type": "ISO8601 timestamp",
+                "example": "2025-05-15T14:30:00Z"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["PENDING", "PENDING_REVIEW", "CONFIRMED"],
+                "example": "CONFIRMED"
+              },
+              "receiptImageUrl": {
+                "type": "string (S3 signed URL)",
+                "example": "https://s3.amazonaws.com/family-ledger-receipts-prod/user-123/2025-05/txn-123.jpg?..."
+              }
+            }
+          ],
+          "total": {
+            "type": "integer",
+            "description": "Total number of transactions matching filter"
+          },
+          "summary": {
+            "totalDeposits": { "type": "number (decimal 2)", "example": 2500.00 },
+            "totalPayments": { "type": "number (decimal 2)", "example": 1200.50 },
+            "netBalance": { "type": "number (decimal 2)", "example": 1299.50 }
+          }
+        }
+      },
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_MONTH_FORMAT",
+          "message": "Month parameter must be in YYYY-MM format"
+        },
+        {
+          "status": 401,
+          "code": "UNAUTHORIZED",
+          "message": "Invalid or missing access token"
+        }
+      ]
+    },
+    {
+      "id": "transaction-create",
+      "path": "/api/transactions",
+      "method": "POST",
+      "description": "Create new transaction by uploading receipt image",
+      "content_type": "multipart/form-data",
+      "request": {
+        "fields": {
+          "categoryId": {
+            "type": "string (UUID)",
+            "required": true,
+            "description": "Category for transaction"
+          },
+          "receiptImage": {
+            "type": "file (image)",
+            "required": true,
+            "description": "Receipt image file (JPEG or PNG)"
+          },
+          "transactionDate": {
+            "type": "ISO8601 date (optional)",
+            "required": false,
+            "description": "Override transaction date (defaults to upload date)"
+          },
+          "notes": {
+            "type": "string (max 200 chars)",
+            "required": false,
+            "description": "Optional user notes"
+          }
+        },
+        "validation": {
+          "image_types": ["image/jpeg", "image/png"],
+          "max_size": "5MB",
+          "image_compression": "Client-side compression to 60-70% JPEG quality before upload"
+        }
+      },
+      "response": {
+        "status": 201,
+        "body": {
+          "transactionId": {
+            "type": "string (UUID)",
+            "example": "550e8400-e29b-41d4-a716-446655440001"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["PENDING", "PENDING_REVIEW", "CONFIRMED"],
+            "description": "Transaction status after Lambda processing"
+          },
+          "receiptImageUrl": {
+            "type": "string (S3 path)",
+            "example": "s3://family-ledger-receipts-prod/user-123/2025-05/txn-123.jpg"
+          },
+          "extractedData": {
+            "merchantName": {
+              "type": "string",
+              "example": "Whole Foods Market"
+            },
+            "amount": {
+              "type": "number",
+              "example": 45.50
+            },
+            "transactionDate": {
+              "type": "ISO8601 date",
+              "example": "2025-05-15"
+            },
+            "confidence": {
+              "type": "number (0-100)",
+              "example": 92,
+              "description": "Comprehend confidence score"
+            }
+          },
+          "message": {
+            "type": "string",
+            "example": "Transaction created. Awaiting Lambda processing.",
+            "description": "Status message for user"
+          }
+        }
+      },
+      "async_processing": {
+        "description": "Receipt processing happens asynchronously",
+        "flow": [
+          "1. API returns immediately with PENDING status",
+          "2. S3 triggered Lambda processes image with Comprehend",
+          "3. Transaction status updated to PENDING_REVIEW or CONFIRMED",
+          "4. User polls /api/transactions/{id} to check status (or use WebSocket/polling)"
+        ]
+      },
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_CATEGORY",
+          "message": "Category not found or does not belong to user"
+        },
+        {
+          "status": 400,
+          "code": "INVALID_IMAGE",
+          "message": "File must be JPEG or PNG, max 5MB"
+        },
+        {
+          "status": 413,
+          "code": "FILE_TOO_LARGE",
+          "message": "Uploaded file exceeds 5MB limit"
+        },
+        {
+          "status": 401,
+          "code": "UNAUTHORIZED",
+          "message": "Invalid or missing access token"
+        }
+      ]
+    },
+    {
+      "id": "transaction-get",
+      "path": "/api/transactions/{transactionId}",
+      "method": "GET",
+      "description": "Get details of specific transaction",
+      "path_parameters": {
+        "transactionId": {
+          "type": "string (UUID)",
+          "required": true,
+          "example": "550e8400-e29b-41d4-a716-446655440001"
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "transactionId": { "type": "string (UUID)" },
+          "categoryId": { "type": "string (UUID)" },
+          "amount": { "type": "number (decimal 2)" },
+          "type": { "type": "string", "enum": ["DEPOSIT", "PAYMENT"] },
+          "merchantName": { "type": "string" },
+          "transactionDate": { "type": "ISO8601 timestamp" },
+          "status": { "type": "string", "enum": ["PENDING", "PENDING_REVIEW", "CONFIRMED"] },
+          "receiptImageUrl": { "type": "string (S3 signed URL)" },
+          "notes": { "type": "string (nullable)" },
+          "extractedData": {
+            "confidence": { "type": "number (0-100)" },
+            "rawText": { "type": "string" },
+            "reviewNotes": { "type": "string (nullable)" }
+          },
+          "createdAt": { "type": "ISO8601 timestamp" },
+          "updatedAt": { "type": "ISO8601 timestamp" }
+        }
+      },
+      "errors": [
+        {
+          "status": 404,
+          "code": "NOT_FOUND",
+          "message": "Transaction not found"
+        },
+        {
+          "status": 403,
+          "code": "FORBIDDEN",
+          "message": "Transaction belongs to another user"
+        }
+      ]
+    },
+    {
+      "id": "transaction-update",
+      "path": "/api/transactions/{transactionId}",
+      "method": "PUT",
+      "description": "Update transaction (confirm, edit, or add notes)",
+      "path_parameters": {
+        "transactionId": {
+          "type": "string (UUID)",
+          "required": true
+        }
+      },
+      "request": {
+        "body": {
+          "status": {
+            "type": "string",
+            "enum": ["CONFIRMED", "PENDING"],
+            "description": "Update status (e.g., user confirms PENDING_REVIEW transaction)"
+          },
+          "merchantName": {
+            "type": "string (optional)",
+            "description": "Override extracted merchant name"
+          },
+          "amount": {
+            "type": "number (optional)",
+            "description": "Override extracted amount"
+          },
+          "transactionDate": {
+            "type": "ISO8601 date (optional)",
+            "description": "Override transaction date"
+          },
+          "notes": {
+            "type": "string (optional, max 200 chars)",
+            "description": "Add or update user notes"
+          },
+          "reviewNotes": {
+            "type": "string (optional)",
+            "description": "User review comments if confirming PENDING_REVIEW transaction"
+          }
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "transactionId": { "type": "string (UUID)" },
+          "status": { "type": "string", "enum": ["PENDING", "PENDING_REVIEW", "CONFIRMED"] },
+          "message": { "type": "string", "example": "Transaction confirmed" }
+        }
+      },
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_STATE_TRANSITION",
+          "message": "Cannot transition from current status to requested status"
+        },
+        {
+          "status": 404,
+          "code": "NOT_FOUND",
+          "message": "Transaction not found"
+        }
+      ]
+    },
+    {
+      "id": "transaction-delete",
+      "path": "/api/transactions/{transactionId}",
+      "method": "DELETE",
+      "description": "Soft delete transaction (hidden from reports, but data preserved)",
+      "path_parameters": {
+        "transactionId": {
+          "type": "string (UUID)",
+          "required": true
+        }
+      },
+      "response": {
+        "status": 200,
+        "body": {
+          "success": { "type": "boolean", "example": true },
+          "message": { "type": "string", "example": "Transaction deleted" }
+        }
+      },
+      "errors": [
+        {
+          "status": 404,
+          "code": "NOT_FOUND",
+          "message": "Transaction not found"
+        }
+      ]
+    }
+  ],
+  "rate_limiting": {
+    "description": "API rate limits per user",
+    "limits": {
+      "GET /api/transactions": "100 requests/minute",
+      "POST /api/transactions": "10 requests/minute (receipt uploads)",
+      "PUT/DELETE": "50 requests/minute"
+    },
+    "error_response": {
+      "status": 429,
+      "body": {
+        "code": "RATE_LIMITED",
+        "message": "Rate limit exceeded. Try again later.",
+        "retry_after_seconds": 60
+      }
+    }
+  }
+}

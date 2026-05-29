@@ -1,0 +1,288 @@
+{
+  "title": "Lambda Receipt Processor Integration",
+  "description": "Serverless event-driven receipt processing pipeline using S3 events, Lambda, and Amazon Comprehend",
+  "version": "1.0",
+  "trigger": {
+    "type": "S3 Event Notification (ObjectCreated)",
+    "source": "family-ledger-receipts-{env}",
+    "filter": {
+      "prefix": "uploads/",
+      "suffix": ".jpg"
+    },
+    "invocation_type": "Asynchronous (async)",
+    "retry_policy": "Automatic retry up to 2 times on failure"
+  },
+  "lambda_function": {
+    "name": "receipt-processor",
+    "runtime": "Python 3.11",
+    "timeout": 60,
+    "memory": 512,
+    "ephemeral_storage": 512,
+    "environment_variables": {
+      "DYNAMODB_TABLE_TRANSACTIONS": "Transactions",
+      "AWS_REGION": "us-east-1",
+      "COMPREHEND_LANGUAGE": "en"
+    }
+  },
+  "input_event": {
+    "description": "S3 event containing object metadata",
+    "example": {
+      "Records": [
+        {
+          "s3": {
+            "bucket": {
+              "name": "family-ledger-receipts-prod"
+            },
+            "object": {
+              "key": "uploads/user-123/2025-05-15/transaction-456.jpg",
+              "size": 1048576
+            }
+          }
+        }
+      ]
+    }
+  },
+  "processing_flow": [
+    {
+      "step": 1,
+      "name": "Parse S3 Event",
+      "action": "Extract bucket name, key, and metadata from S3 event",
+      "input": "S3 ObjectCreated event",
+      "output": {
+        "bucket": "family-ledger-receipts-prod",
+        "key": "uploads/user-123/2025-05-15/transaction-456.jpg",
+        "userId": "user-123",
+        "transactionId": "transaction-456"
+      }
+    },
+    {
+      "step": 2,
+      "name": "Download Receipt Image",
+      "action": "Fetch image from S3 to Lambda /tmp storage",
+      "aws_service": "S3 GetObject",
+      "error_handling": "If S3 access fails, log error and exit (DLQ optional)"
+    },
+    {
+      "step": 3,
+      "name": "Extract Text with AWS Textract (Optional)",
+      "action": "Use Textract for advanced OCR if image quality sufficient",
+      "aws_service": "Textract DetectDocumentText",
+      "condition": "Only if image size > 500KB (skip for fast processing)",
+      "output": "raw_text string containing all detected text"
+    },
+    {
+      "step": 4,
+      "name": "Entity Recognition",
+      "action": "Detect merchant names, dates, amounts using Comprehend",
+      "aws_service": "Comprehend DetectEntities",
+      "payload": {
+        "Text": "raw_text from Step 3",
+        "LanguageCode": "en"
+      },
+      "expected_entities": [
+        { "Type": "ORGANIZATION", "Name": "Whole Foods Market" },
+        { "Type": "DATE", "Name": "May 15, 2025" },
+        { "Type": "OTHER", "Text": "$45.50" }
+      ]
+    },
+    {
+      "step": 5,
+      "name": "Parse Extracted Data",
+      "action": "Extract merchant, date, and amount from entities",
+      "logic": {
+        "merchant": "First ORGANIZATION entity or highest confidence entity",
+        "date": "Parse DATE entity, convert to ISO8601",
+        "amount": "Extract currency value from text, parse as number"
+      },
+      "fallback": "If extraction fails, use raw text for manual review"
+    },
+    {
+      "step": 6,
+      "name": "Calculate Confidence Score",
+      "action": "Average confidence scores from all entities",
+      "formula": "avg(entity.confidence for all entities)",
+      "threshold_check": {
+        "if_confidence_gte_90": "Auto-accept or PENDING_REVIEW (user can override)",
+        "if_confidence_lt_90": "Mark PENDING_REVIEW, require manual validation"
+      }
+    },
+    {
+      "step": 7,
+      "name": "Update DynamoDB",
+      "action": "Write extracted data and transaction status to DynamoDB",
+      "aws_service": "DynamoDB PutItem",
+      "table": "Transactions",
+      "update": {
+        "transactionId": "transaction-456",
+        "userId": "user-123",
+        "status": "PENDING_REVIEW or CONFIRMED",
+        "extractedData": {
+          "confidence": 92,
+          "merchantName": "Whole Foods Market",
+          "amount": 45.50,
+          "transactionDate": "2025-05-15T00:00:00Z",
+          "rawText": "WHOLE FOODS MARKET ... May 15, 2025 ... Total: $45.50"
+        },
+        "updatedAt": "ISO8601 timestamp"
+      }
+    },
+    {
+      "step": 8,
+      "name": "Log Success",
+      "action": "Write summary to CloudWatch Logs",
+      "log_entry": {
+        "event": "receipt_processed",
+        "transactionId": "transaction-456",
+        "confidence": 92,
+        "status": "PENDING_REVIEW",
+        "duration_ms": 2500
+      }
+    }
+  ],
+  "error_handling": {
+    "S3_access_error": {
+      "description": "Cannot read image from S3",
+      "retry_strategy": "Automatic retry (2x with backoff)",
+      "fallback": "Log to CloudWatch, alert DevOps via SNS",
+      "transaction_status": "ERROR"
+    },
+    "comprehend_timeout": {
+      "description": "Comprehend API timeout after 30 seconds",
+      "retry_strategy": "Retry up to 3 times (1s, 2s, 4s backoff)",
+      "fallback": "Mark transaction PENDING_REVIEW, require manual entry",
+      "transaction_status": "PENDING_REVIEW"
+    },
+    "comprehend_api_limit": {
+      "description": "Comprehend rate limit exceeded (TooManyRequestsException)",
+      "retry_strategy": "Queue job in DynamoDB, process in separate scheduled Lambda",
+      "fallback": "DLQ (Dead Letter Queue) optional",
+      "transaction_status": "PENDING"
+    },
+    "image_corruption": {
+      "description": "Image unreadable or corrupted",
+      "fallback": "Mark PENDING_REVIEW, notify user to re-upload",
+      "transaction_status": "PENDING_REVIEW"
+    },
+    "low_confidence": {
+      "description": "Confidence < 90% threshold",
+      "fallback": "Mark PENDING_REVIEW, show user extracted data for confirmation",
+      "transaction_status": "PENDING_REVIEW"
+    }
+  },
+  "output": {
+    "description": "No direct HTTP response (async event)",
+    "side_effects": [
+      "Transaction record updated in DynamoDB",
+      "Receipt image stored in S3 (60-70% JPEG quality, compressed client-side)",
+      "CloudWatch logs generated with processing summary",
+      "Optional: SNS notification sent to user (future feature)"
+    ]
+  },
+  "monitoring": {
+    "cloudwatch_metrics": [
+      {
+        "metric": "LambdaInvocations",
+        "unit": "Count",
+        "description": "Total receipt processing Lambda invocations"
+      },
+      {
+        "metric": "LambdaDuration",
+        "unit": "Milliseconds",
+        "description": "Time to process receipt (target: <5 seconds)"
+      },
+      {
+        "metric": "LambdaErrors",
+        "unit": "Count",
+        "description": "Failed processing attempts"
+      },
+      {
+        "metric": "ComprehendConfidence",
+        "unit": "Percent",
+        "description": "Average confidence scores (track if below 90%)"
+      }
+    ],
+    "cloudwatch_logs": {
+      "log_group": "/aws/lambda/receipt-processor",
+      "retention": "7 days",
+      "log_level": "INFO (errors) and DEBUG (verbose)"
+    },
+    "alarms": [
+      {
+        "alarm": "LambdaError",
+        "threshold": "> 5 errors in 5 minutes",
+        "action": "SNS notification to DevOps"
+      },
+      {
+        "alarm": "HighLatency",
+        "threshold": "P95 duration > 30 seconds",
+        "action": "SNS notification + manual investigation"
+      }
+    ]
+  },
+  "iam_permissions": {
+    "required_actions": [
+      "s3:GetObject",
+      "dynamodb:PutItem",
+      "dynamodb:UpdateItem",
+      "comprehend:DetectEntities",
+      "comprehend:DetectKeyPhrases",
+      "textract:DetectDocumentText (optional)",
+      "logs:CreateLogGroup",
+      "logs:CreateLogStream",
+      "logs:PutLogEvents"
+    ],
+    "policy_snippet": {
+      "Version": "2012-10-17",
+      "Statement": [
+        {
+          "Effect": "Allow",
+          "Action": ["s3:GetObject"],
+          "Resource": "arn:aws:s3:::family-ledger-receipts-*/*"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["dynamodb:PutItem", "dynamodb:UpdateItem"],
+          "Resource": "arn:aws:dynamodb:us-east-1:*:table/Transactions"
+        },
+        {
+          "Effect": "Allow",
+          "Action": ["comprehend:DetectEntities", "comprehend:DetectKeyPhrases"],
+          "Resource": "*"
+        }
+      ]
+    }
+  },
+  "cost_estimate": {
+    "per_receipt": {
+      "lambda_compute": "$0.000000167 (512MB × 2.5s)",
+      "comprehend_api": "$0.0001 per request",
+      "s3_storage": "$0.023 per GB per month (500KB receipt ≈ $0.000012/month)",
+      "total_per_receipt": "$0.00012"
+    },
+    "monthly_100_users_2_receipts_each": {
+      "lambda": "$0.25 (200 invocations)",
+      "comprehend": "$0.20 (200 API calls)",
+      "s3": "$0.03 (100MB storage)",
+      "total": "$0.48 (within free tier)"
+    }
+  },
+  "testing_strategy": {
+    "unit_tests": [
+      "Mock S3 event parsing",
+      "Mock Comprehend response handling",
+      "Confidence threshold logic (>90%, <90%)",
+      "Date/amount parsing edge cases"
+    ],
+    "integration_tests": [
+      "End-to-end with local DynamoDB",
+      "Mocked Comprehend API responses",
+      "Error path testing (S3 404, Comprehend timeout)",
+      "Verify DynamoDB transaction updates"
+    ],
+    "load_tests": [
+      "1000 concurrent receipt uploads (estimate Lambda scaling)",
+      "Comprehend API rate limit behavior",
+      "DynamoDB write capacity under load"
+    ]
+  }
+}

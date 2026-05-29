@@ -1,0 +1,249 @@
+{
+  "title": "Authentication API Endpoints",
+  "description": "User registration, login, logout, and JWT token refresh endpoints",
+  "version": "1.0",
+  "base_url": "{BACKEND_URL}/api/auth",
+  "endpoints": [
+    {
+      "id": "auth-register",
+      "path": "/api/auth/register",
+      "method": "POST",
+      "description": "Register new user account",
+      "request": {
+        "content_type": "application/json",
+        "body": {
+          "email": {
+            "type": "string (email)",
+            "required": true,
+            "description": "User email address (must be unique, lowercased)",
+            "example": "user@example.com",
+            "validation": "RFC 5322 email format"
+          },
+          "password": {
+            "type": "string",
+            "required": true,
+            "description": "User password (min 8 chars, require uppercase + digit + special char)",
+            "example": "SecurePass123!",
+            "validation": "Min 8 chars, regex: /^(?=.*[A-Z])(?=.*\\d)(?=.*[@$!%*?&])[A-Za-z\\d@$!%*?&]{8,}$/"
+          },
+          "firstName": {
+            "type": "string",
+            "required": true,
+            "description": "User first name",
+            "example": "John",
+            "validation": "Max 50 chars, trim whitespace"
+          },
+          "lastName": {
+            "type": "string",
+            "required": true,
+            "description": "User last name",
+            "example": "Doe",
+            "validation": "Max 50 chars, trim whitespace"
+          }
+        }
+      },
+      "response": {
+        "content_type": "application/json",
+        "status": 201,
+        "body": {
+          "userId": {
+            "type": "string (UUID)",
+            "example": "550e8400-e29b-41d4-a716-446655440000",
+            "description": "Unique user identifier"
+          },
+          "email": {
+            "type": "string",
+            "example": "user@example.com",
+            "description": "Registered email address"
+          },
+          "accessToken": {
+            "type": "string (JWT)",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "JWT access token (1-hour expiration)"
+          },
+          "refreshToken": {
+            "type": "string (opaque)",
+            "example": "refresh_token_hash_...",
+            "description": "Refresh token (7-day expiration, httpOnly cookie)"
+          }
+        }
+      },
+      "errors": [
+        {
+          "status": 400,
+          "code": "INVALID_EMAIL",
+          "message": "Invalid email format or email already registered"
+        },
+        {
+          "status": 400,
+          "code": "WEAK_PASSWORD",
+          "message": "Password does not meet complexity requirements"
+        },
+        {
+          "status": 409,
+          "code": "EMAIL_EXISTS",
+          "message": "Email already registered"
+        }
+      ]
+    },
+    {
+      "id": "auth-login",
+      "path": "/api/auth/login",
+      "method": "POST",
+      "description": "Authenticate user and issue JWT tokens",
+      "request": {
+        "content_type": "application/json",
+        "body": {
+          "email": {
+            "type": "string (email)",
+            "required": true,
+            "example": "user@example.com"
+          },
+          "password": {
+            "type": "string",
+            "required": true,
+            "example": "SecurePass123!"
+          }
+        }
+      },
+      "response": {
+        "content_type": "application/json",
+        "status": 200,
+        "body": {
+          "userId": {
+            "type": "string (UUID)",
+            "example": "550e8400-e29b-41d4-a716-446655440000"
+          },
+          "email": {
+            "type": "string",
+            "example": "user@example.com"
+          },
+          "accessToken": {
+            "type": "string (JWT)",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "refreshToken": {
+            "type": "string (opaque)",
+            "example": "refresh_token_hash_..."
+          }
+        }
+      },
+      "errors": [
+        {
+          "status": 401,
+          "code": "INVALID_CREDENTIALS",
+          "message": "Invalid email or password"
+        },
+        {
+          "status": 429,
+          "code": "TOO_MANY_ATTEMPTS",
+          "message": "Too many failed login attempts. Try again later."
+        }
+      ]
+    },
+    {
+      "id": "auth-logout",
+      "path": "/api/auth/logout",
+      "method": "POST",
+      "description": "Revoke refresh token and logout user",
+      "authentication": "Bearer {accessToken}",
+      "request": {
+        "content_type": "application/json",
+        "body": {}
+      },
+      "response": {
+        "content_type": "application/json",
+        "status": 200,
+        "body": {
+          "success": {
+            "type": "boolean",
+            "example": true,
+            "description": "Logout successful"
+          }
+        }
+      },
+      "errors": [
+        {
+          "status": 401,
+          "code": "UNAUTHORIZED",
+          "message": "Invalid or missing access token"
+        }
+      ]
+    },
+    {
+      "id": "auth-refresh-token",
+      "path": "/api/auth/refresh-token",
+      "method": "POST",
+      "description": "Refresh expired access token using refresh token",
+      "request": {
+        "content_type": "application/json",
+        "body": {
+          "refreshToken": {
+            "type": "string (opaque)",
+            "required": true,
+            "description": "Refresh token from login/register response"
+          }
+        }
+      },
+      "response": {
+        "content_type": "application/json",
+        "status": 200,
+        "body": {
+          "accessToken": {
+            "type": "string (JWT)",
+            "example": "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9...",
+            "description": "New JWT access token (1-hour expiration)"
+          }
+        }
+      },
+      "errors": [
+        {
+          "status": 401,
+          "code": "INVALID_REFRESH_TOKEN",
+          "message": "Refresh token is invalid or expired"
+        },
+        {
+          "status": 429,
+          "code": "RATE_LIMITED",
+          "message": "Too many refresh token requests. Limit: 100/hour per user"
+        }
+      ]
+    }
+  ],
+  "jwt_payload": {
+    "description": "Access token JWT payload structure",
+    "body": {
+      "sub": {
+        "type": "string (UUID)",
+        "example": "550e8400-e29b-41d4-a716-446655440000",
+        "description": "Subject (user ID)"
+      },
+      "email": {
+        "type": "string",
+        "example": "user@example.com",
+        "description": "User email address"
+      },
+      "iat": {
+        "type": "integer (Unix timestamp)",
+        "description": "Issued at time"
+      },
+      "exp": {
+        "type": "integer (Unix timestamp)",
+        "description": "Expiration time (1 hour from iat)"
+      },
+      "iss": {
+        "type": "string",
+        "example": "family-ledger",
+        "description": "Token issuer"
+      }
+    }
+  },
+  "security": {
+    "password_hashing": "bcrypt (rounds=12)",
+    "token_signing": "RSA-256 (asymmetric)",
+    "refresh_token_storage": "Hashed in DynamoDB with bcrypt (rounds=12)",
+    "httpOnly_cookies": "Both accessToken and refreshToken stored as httpOnly cookies",
+    "cors": "Restricted to Heroku frontend domain (e.g., https://family-ledger.herokuapp.com)",
+    "rate_limiting": "10 requests/minute per user on all auth endpoints"
+  }
+}
