@@ -1,0 +1,38 @@
+{
+  "name": "family-ledger",
+  "version": "1.0.0",
+  "description": "Billetera Digital - Family Finance Ledger Application",
+  "private": true,
+  "workspaces": [
+    "src/backend",
+    "src/frontend"
+  ],
+  "scripts": {
+    "install:all": "npm install --workspaces",
+    "dev:backend": "cd src/backend && npm run dev",
+    "dev:frontend": "cd src/frontend && npm start",
+    "dev": "npm-run-all --parallel dev:backend dev:frontend",
+    "build:backend": "cd src/backend && npm run build",
+    "build:frontend": "cd src/frontend && npm run build",
+    "build": "npm-run-all --parallel build:backend build:frontend",
+    "start:backend": "cd src/backend && npm start",
+    "start:frontend": "cd src/frontend && npm start",
+    "type-check": "npm-run-all --parallel type-check:backend",
+    "type-check:backend": "cd src/backend && npm run type-check",
+    "lint": "cd src/backend && npm run lint"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": [
+    "expense-tracking",
+    "family-finance",
+    "wallet",
+    "react",
+    "express",
+    "aws"
+  ]
+}
