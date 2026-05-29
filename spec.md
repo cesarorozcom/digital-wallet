@@ -1,0 +1,377 @@
+# Digital Wallet & Expense Ledger - Project Specification
+
+## Project Overview
+
+A mobile-first web application for family expense tracking and financial management. Users can capture receipts via photo, automatically extract transaction details, and categorize expenses. The system provides real-time transaction processing and analytics to help families improve their financial health.
+
+**Project Name**: Family Finance Ledger (Billetera Digital)
+
+---
+
+## User Stories & Functional Requirements
+
+### 1. User Authentication & Management
+- **Story**: Multi-user system with secure authentication
+- **Requirements**:
+  - User registration and login
+  - JWT-based session management
+  - Password security (bcrypt hashing)
+  - User profile management
+  - Multi-user support with role-based access
+
+### 2. Category Management
+- **Story**: Users configure categories that match their personal needs
+- **Requirements**:
+  - Create, read, update, delete (CRUD) categories
+  - Each user has personalized categories
+  - Categories can have 0 or more transactions
+  - Categories are user-scoped (multi-tenancy)
+
+### 3. Receipt Capture & Processing
+- **Story**: User takes photo of receipt → automatic data extraction → transaction creation
+- **Requirements**:
+  - Camera integration for mobile web (file input with camera)
+  - Photo upload to AWS S3
+  - S3 Create Object event triggers Lambda function
+  - Lambda uses Amazon Comprehend for OCR/text extraction
+  - Extract: merchant name, transaction date, total amount
+  - Result stored in DynamoDB
+
+### 4. Transaction Management
+- **Story**: Create, view, and manage transactions with category assignment
+- **Requirements**:
+  - Transaction types: Deposit (value > 0) or Payment (value * -1)
+  - Transaction validity scoped to calendar month
+  - Transaction date is critical for reporting
+  - Transaction requires: category, amount, date, receipt image reference
+  - User authentication required to finalize transaction
+  - Transaction states: pending (receipt captured), confirmed (authenticated)
+
+### 5. Transaction Analytics & Reporting
+- **Story**: User views spending by category and month
+- **Requirements**:
+  - Monthly expense breakdown by category
+  - Total deposits vs. payments
+  - Visual dashboard (charts/summaries)
+  - Filter transactions by date range and category
+
+---
+
+## Non-Functional Requirements
+
+### Security
+- End-to-end encryption for sensitive data in transit (HTTPS/TLS)
+- Authentication via JWT tokens
+- Role-based access control (user can only access their own data)
+- DynamoDB encryption at rest
+- S3 bucket encryption and access restrictions
+- AWS IAM policies: principle of least privilege
+- Input validation and sanitization (OWASP top 10)
+- Rate limiting on API endpoints
+
+### Performance & Scalability
+- Responsive design for mobile/tablet/desktop
+- Lazy loading for transaction lists
+- Image compression before S3 upload
+- DynamoDB on-demand billing for variable load
+- Lambda timeout: 60 seconds for receipt processing
+- Caching strategy for frequently accessed data
+
+### Multi-Tenancy & Data Isolation
+- User data strictly isolated
+- Row-level security: each user only sees their transactions/categories
+- DynamoDB partition key: userId
+
+### Maintainability
+- Clean, modular code architecture
+- Clear separation of concerns (UI, API, business logic)
+- Comprehensive error handling and logging
+- Code documentation and inline comments where necessary
+- Version control (Git) with semantic versioning
+
+### Logging & Monitoring
+- CloudWatch logs with 7-day TTL
+- Error tracking and alerting
+- Lambda execution logs
+- API request/response logging
+- User action audit trail
+
+---
+
+## Data Model
+
+### Entity Relationships
+
+```
+User
+├── Category (1 to many)
+│   └── Transaction (0 to many)
+└── (authentication, profile)
+
+Transaction
+├── Category (many to 1)
+├── Receipt Image (S3 reference)
+└── Extracted Data (from Comprehend)
+```
+
+### Core Entities
+
+#### User
+```
+{
+  userId: UUID (PK)
+  email: string (unique)
+  passwordHash: string (bcrypt)
+  firstName: string
+  lastName: string
+  createdAt: ISO8601
+  updatedAt: ISO8601
+}
+```
+
+#### Category
+```
+{
+  categoryId: UUID (PK)
+  userId: UUID (SK, GSI)
+  name: string
+  color: string (hex, optional)
+  icon: string (optional)
+  createdAt: ISO8601
+  updatedAt: ISO8601
+}
+```
+
+#### Transaction
+```
+{
+  transactionId: UUID (PK)
+  userId: UUID (SK, GSI)
+  categoryId: UUID (GSI)
+  amount: number (positive for deposit, negative for payment)
+  transactionDate: ISO8601
+  transactionMonth: YYYY-MM (for monthly queries)
+  type: 'DEPOSIT' | 'PAYMENT'
+  merchantName: string (extracted from receipt)
+  receiptImageUrl: string (S3 path)
+  status: 'PENDING' | 'CONFIRMED'
+  notes: string (optional)
+  createdAt: ISO8601
+  updatedAt: ISO8601
+  extractedData: {
+    confidence: number (0-100, from Comprehend)
+    rawText: string
+  }
+}
+```
+
+---
+
+## Technical Architecture
+
+### Frontend (Heroku)
+- **Framework**: React.js or Vue.js
+- **Styling**: TailwindCSS or Bootstrap (mobile-first responsive)
+- **Camera Integration**: MediaDevices API (HTML5)
+- **State Management**: Redux/Vuex or Context API
+- **HTTP Client**: Axios or Fetch API
+- **Authentication**: JWT stored in httpOnly cookies
+- **Deployment**: Heroku buildpack for Node.js
+
+**Stack Options**:
+1. **Recommended**: Node.js (Express) + React + PostgreSQL (for session state if needed)
+2. **Alternative**: Node.js (NestJS) + Vue.js
+
+### Backend (AWS)
+
+#### Compute
+- **Lambda Functions**:
+  - Receipt Processing Lambda (triggered by S3 CreateObject)
+  - API Lambda (wrapped in API Gateway) or traditional REST API
+  - Timeout: 60 seconds for Comprehend processing
+
+#### Storage
+- **S3**:
+  - Bucket: `family-ledger-receipts-{env}`
+  - Folder structure: `{userId}/{year}/{month}/{transactionId}.jpg`
+  - Lifecycle policy: Archive to Glacier after 90 days
+  - Encryption: AES-256 at rest
+  - Access: Private (CloudFront optional for serving)
+
+- **DynamoDB**:
+  - Table: `Transactions`
+    - PK: `userId#transactionId`
+    - SK: `transactionDate`
+    - GSI1: `userId#transactionMonth`
+    - GSI2: `categoryId#transactionDate`
+  - Table: `Users`
+    - PK: `userId`
+  - Table: `Categories`
+    - PK: `userId#categoryId`
+    - SK: `createdAt`
+  - Billing: On-demand mode
+  - Backup: Point-in-time recovery enabled
+
+#### API Gateway
+- REST API or HTTP API
+- CORS configuration for Heroku frontend domain
+- Request/response validation
+- Rate limiting and throttling
+- API keys for Lambda auth (optional, use IAM roles preferred)
+
+#### AI/ML
+- **Amazon Comprehend**:
+  - Text extraction from receipt images
+  - Entity recognition for merchant names
+  - Confidence scoring
+  - Alternative: AWS Textract for more advanced OCR
+
+#### Monitoring & Logging
+- **CloudWatch**:
+  - Log Group: `/aws/lambda/receipt-processor`
+  - Log retention: 7 days
+  - Custom metrics for transaction processing
+  - Alarms for Lambda errors
+
+---
+
+## API Endpoints (RESTful)
+
+```
+Authentication
+POST   /api/auth/register          - User registration
+POST   /api/auth/login             - User login
+POST   /api/auth/logout            - User logout
+POST   /api/auth/refresh-token     - Refresh JWT
+
+Users
+GET    /api/users/{userId}         - Get user profile
+PUT    /api/users/{userId}         - Update user profile
+
+Categories
+GET    /api/categories             - List user categories
+POST   /api/categories             - Create category
+PUT    /api/categories/{catId}     - Update category
+DELETE /api/categories/{catId}     - Delete category
+
+Transactions
+GET    /api/transactions           - List transactions (with filters: month, category)
+POST   /api/transactions           - Create transaction (multipart with image)
+GET    /api/transactions/{txnId}   - Get transaction details
+PUT    /api/transactions/{txnId}   - Update transaction
+DELETE /api/transactions/{txnId}   - Delete transaction (soft delete)
+
+Analytics
+GET    /api/analytics/monthly      - Monthly spending summary
+GET    /api/analytics/by-category  - Breakdown by category
+GET    /api/analytics/trends       - Spending trends
+```
+
+---
+
+## Security Considerations
+
+### Authentication & Authorization
+- JWT tokens with 1-hour expiration
+- Refresh tokens with 7-day expiration
+- All API endpoints require authentication
+- User can only access their own data (verified via userId in JWT)
+
+### Data Protection
+- Passwords hashed with bcrypt (rounds: 12)
+- Sensitive data encrypted in DynamoDB (enable encryption at rest)
+- HTTPS only (no HTTP)
+- CORS restricted to Heroku domain
+
+### Input Validation
+- Validate file type (image/jpeg, image/png only)
+- Validate file size (max 5MB)
+- Sanitize all user inputs on backend
+- Rate limit API endpoints (10 requests/minute per user)
+
+### AWS Security
+- S3 bucket: Block all public access
+- Lambda execution role: minimal permissions (S3 read, DynamoDB write, Comprehend, CloudWatch)
+- DynamoDB: encryption at rest + point-in-time recovery
+- CloudWatch logs: access restricted to service roles
+
+---
+
+## Development Phases
+
+### Phase 1: Foundation (Weeks 1-2)
+- [ ] Setup Heroku app and AWS services
+- [ ] User authentication (registration, login, JWT)
+- [ ] Database schema and DynamoDB tables
+- [ ] Frontend: Login/register UI, responsive layout
+
+### Phase 2: Core Features (Weeks 3-4)
+- [ ] Category CRUD operations
+- [ ] Transaction creation flow (UI + API)
+- [ ] Receipt image upload to S3
+- [ ] Lambda + Comprehend integration for data extraction
+
+### Phase 3: Advanced Features (Weeks 5-6)
+- [ ] Transaction list and filtering
+- [ ] Analytics dashboard (monthly summary, charts)
+- [ ] Edit/delete transactions
+- [ ] User profile management
+
+### Phase 4: Refinement & Deployment (Weeks 7-8)
+- [ ] Performance optimization (image compression, lazy loading)
+- [ ] Security hardening (rate limiting, input validation)
+- [ ] Comprehensive testing (unit, integration, e2e)
+- [ ] Production deployment to Heroku + AWS
+
+---
+
+## Success Criteria
+
+- ✅ Users can capture receipts and automatically extract transaction data
+- ✅ Multi-user system with secure authentication
+- ✅ Responsive UI works on mobile, tablet, desktop
+- ✅ Transaction data persists and is queryable by month/category
+- ✅ Code is maintainable and well-documented
+- ✅ Zero security vulnerabilities (OWASP top 10)
+- ✅ CloudWatch logs captured with 7-day retention
+- ✅ System handles concurrent users without degradation
+
+---
+
+## Technology Stack Summary
+
+| Component | Technology | Rationale |
+|-----------|------------|-----------|
+| Frontend | React + TailwindCSS | Fast, component-based, mobile-first styling |
+| Backend API | Node.js + Express/NestJS | Simple, maintainable, well-documented |
+| Frontend Hosting | Heroku | PaaS, easy deployment, auto-scaling |
+| Image Storage | AWS S3 | Scalable, cost-effective, event-driven |
+| Database | DynamoDB | ACID compliance, serverless, multi-tenancy optimized |
+| OCR/Extraction | Amazon Comprehend | Managed service, no infrastructure overhead |
+| Compute | AWS Lambda | Serverless, pay-per-use, triggered by S3 events |
+| Logging | CloudWatch | Integrated with AWS, easy retention management |
+| Authentication | JWT | Stateless, scalable, secure |
+
+---
+
+## Assumptions & Constraints
+
+- Users have stable internet connectivity (web-based, not offline-first)
+- Receipt images must be legible for Comprehend to extract data
+- Single currency (can extend for multi-currency later)
+- AWS region: us-east-1 (can be parameterized)
+- Heroku region: us or eu (based on user location)
+
+---
+
+## Future Enhancements
+
+- Mobile app (React Native/Flutter) for native camera access
+- Receipt OCR confidence override by user
+- Budget alerts and notifications
+- Recurring transaction templates
+- Data export (CSV, PDF)
+- Multi-currency support
+- Social features (shared budgets/categories)
+- Machine learning for automatic categorization
+
