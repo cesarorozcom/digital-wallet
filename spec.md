@@ -129,6 +129,19 @@ Transaction
 }
 ```
 
+#### RefreshToken
+```
+{
+  tokenId: UUID (PK)
+  userId: UUID (SK, GSI)
+  hashedToken: string (hashed for security)
+  expiresAt: ISO8601 (TTL attribute for auto-deletion)
+  createdAt: ISO8601
+  revokedAt: ISO8601 (optional, for logout)
+}
+```
+**Note**: DynamoDB TTL will automatically delete expired tokens after 7 days.
+
 #### Category
 ```
 {
@@ -269,13 +282,46 @@ GET    /api/analytics/trends       - Spending trends
 
 ---
 
-## Security Considerations
+## Stateless Authentication with JWT
+
+### How It Works
+
+**Stateless JWT approach** means the backend **does not store session data**. Instead:
+
+1. **User logs in** → Backend verifies credentials (email + password hash from DynamoDB)
+2. **Backend generates two tokens**:
+   - **Access Token (JWT)**: Contains `userId`, `email`, token type, expiration (1 hour)
+   - **Refresh Token (opaque string)**: Stored in DynamoDB with TTL, expires in 7 days
+3. **Frontend stores tokens**:
+   - Access Token: httpOnly cookie (automatic with every request)
+   - Refresh Token: httpOnly cookie (used only to refresh access token)
+4. **Every API request** includes Access Token in `Authorization: Bearer <token>`
+5. **Backend verifies JWT**:
+   - Decode token signature (no database query needed)
+   - Check expiration and userId
+   - If valid, user is authenticated
+6. **When Access Token expires** (1 hour):
+   - Frontend sends Refresh Token to `/api/auth/refresh-token`
+   - Backend verifies Refresh Token exists in DynamoDB (check TTL)
+   - If valid, generate new Access Token
+   - If invalid/expired, user must re-login
+
+### Why This is "Stateless"
+
+- **No session store needed** (no PostgreSQL)
+- Each request is independent and self-contained
+- Token verification is cryptographic (CPU-only, no database queries)
+- Scales horizontally without shared state (perfect for Lambda + API Gateway)
+
+### Security Considerations
 
 ### Authentication & Authorization
-- JWT tokens with 1-hour expiration
-- Refresh tokens with 7-day expiration
-- All API endpoints require authentication
-- User can only access their own data (verified via userId in JWT)
+- **Access Token (JWT)**: 1-hour expiration, contains minimal claims (`userId`, `email`)
+- **Refresh Token**: 7-day expiration, stored in DynamoDB with TTL attribute for auto-deletion
+- Token validation: Signature verification via RSA public key (no DB lookup)
+- All API endpoints require valid Access Token in `Authorization` header
+- User can only access their own data (verified via `userId` in JWT claims)
+- Token revocation: User logout deletes Refresh Token from DynamoDB (invalidates session)
 
 ### Data Protection
 - Passwords hashed with bcrypt (rounds: 12)
