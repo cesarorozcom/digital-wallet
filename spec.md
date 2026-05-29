@@ -40,12 +40,16 @@ A mobile-first web application for family expense tracking and financial managem
 ### 4. Transaction Management
 - **Story**: Create, view, and manage transactions with category assignment
 - **Requirements**:
-  - Transaction types: Deposit (value > 0) or Payment (value * -1)
+  - **Transaction types: Deposit (value > 0) or Payment (value × -1)** only (no refunds or transfers)
   - Transaction validity scoped to calendar month
   - Transaction date is critical for reporting
   - Transaction requires: category, amount, date, receipt image reference
   - User authentication required to finalize transaction
-  - Transaction states: pending (receipt captured), confirmed (authenticated)
+  - Transaction states: 
+    - **PENDING** (receipt captured, awaiting Comprehend processing)
+    - **PENDING_REVIEW** (confidence < 90%, user must confirm)
+    - **CONFIRMED** (authenticated and validated)
+  - **No transaction limits** on amount or frequency
 
 ### 5. Transaction Analytics & Reporting
 - **Story**: User views spending by category and month
@@ -72,10 +76,11 @@ A mobile-first web application for family expense tracking and financial managem
 ### Performance & Scalability
 - Responsive design for mobile/tablet/desktop
 - Lazy loading for transaction lists
-- Image compression before S3 upload
+- **Image compression: 60-70% JPEG quality** before S3 upload (prioritizes cost-effectiveness)
 - DynamoDB on-demand billing for variable load
 - Lambda timeout: 60 seconds for receipt processing
 - Caching strategy for frequently accessed data
+- **SLA Target**: Best-effort (no specific uptime target)
 
 ### Multi-Tenancy & Data Isolation
 - User data strictly isolated
@@ -161,19 +166,20 @@ Transaction
   transactionId: UUID (PK)
   userId: UUID (SK, GSI)
   categoryId: UUID (GSI)
-  amount: number (positive for deposit, negative for payment)
+  amount: number (positive for deposit, negative for payment, unlimited)
   transactionDate: ISO8601
   transactionMonth: YYYY-MM (for monthly queries)
-  type: 'DEPOSIT' | 'PAYMENT'
+  type: 'DEPOSIT' | 'PAYMENT' (only these two types)
   merchantName: string (extracted from receipt)
-  receiptImageUrl: string (S3 path)
-  status: 'PENDING' | 'CONFIRMED'
+  receiptImageUrl: string (S3 path, JPEG 60-70% quality)
+  status: 'PENDING' | 'PENDING_REVIEW' | 'CONFIRMED'
   notes: string (optional)
   createdAt: ISO8601
   updatedAt: ISO8601
   extractedData: {
-    confidence: number (0-100, from Comprehend)
+    confidence: number (0-100, from Comprehend; ≥90% threshold)
     rawText: string
+    reviewNotes: string (optional, if status = PENDING_REVIEW)
   }
 }
 ```
@@ -236,8 +242,10 @@ Transaction
 - **Amazon Comprehend**:
   - Text extraction from receipt images
   - Entity recognition for merchant names
-  - Confidence scoring
+  - **Confidence threshold: ≥90%** required to accept extracted data automatically
   - Alternative: AWS Textract for more advanced OCR
+  - User may review and confirm even if confidence is high
+  - If confidence < 90%, transaction enters PENDING_REVIEW state requiring user validation
 
 #### Monitoring & Logging
 - **CloudWatch**:
@@ -407,6 +415,36 @@ GET    /api/analytics/trends       - Spending trends
 - Single currency (can extend for multi-currency later)
 - AWS region: us-east-1 (can be parameterized)
 - Heroku region: us or eu (based on user location)
+
+---
+
+## Clarifications (Finalized)
+
+### 1. Comprehend Confidence Threshold
+- **Decision**: ≥90% confidence required to accept extracted data automatically
+- **Implementation**: 
+  - If confidence ≥90%: Transaction moves to CONFIRMED state (user can review)
+  - If confidence < 90%: Transaction enters PENDING_REVIEW state (requires user validation before confirmation)
+
+### 2. Image Compression Strategy
+- **Decision**: Compress all images to 60-70% JPEG quality before S3 upload
+- **Rationale**: Prioritizes cost-effectiveness over pristine OCR accuracy
+- **Implementation**: Client-side compression before upload; Lambda can request original if needed
+
+### 3. Transaction Limits
+- **Decision**: No limits on transaction amounts or frequency
+- **Rationale**: Supports high-value and high-volume users; trust in input validation instead
+- **Constraint**: May require horizontal scaling if single user drives extreme volume
+
+### 4. Transaction Types
+- **Decision**: Only DEPOSIT and PAYMENT types supported
+- **Rationale**: Keeps data model simple; negative amounts handle refunds naturally
+- **No support for**: Refunds (as separate type), Transfers, Adjustments (use PAYMENT with notes)
+
+### 5. System Availability (SLA)
+- **Decision**: Best-effort (no specific SLA target)
+- **Rationale**: Aligns with serverless architecture; no uptime commitments
+- **Implementation**: Leverage AWS native monitoring and alerting, focus on error recovery
 
 ---
 
