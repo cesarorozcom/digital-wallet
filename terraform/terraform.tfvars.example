@@ -1,0 +1,33 @@
+# Terraform Variables Configuration Example
+# Copy this file to terraform.tfvars and fill in your specific values
+
+aws_region     = "us-east-1"
+environment    = "development"
+project_name   = "billetera-digital"
+
+# REQUIRED: Must be globally unique
+s3_bucket_name = "my-unique-billetera-receipts-bucket-12345"
+
+# DynamoDB Capacity (adjust based on expected load)
+dynamodb_read_capacity                 = 5
+dynamodb_write_capacity                = 5
+dynamodb_transactions_read_capacity    = 10
+dynamodb_transactions_write_capacity   = 10
+
+# CloudWatch Logs retention (in days)
+cloudwatch_log_retention_days = 7
+
+# IAM Resources
+backend_iam_username = "billetera-backend"
+lambda_role_name     = "billetera-lambda-role"
+
+# DynamoDB Point-in-time Recovery (recommended for production)
+enable_point_in_time_recovery = true
+
+# Common Tags (applied to all resources)
+tags = {
+  Project     = "Billetera Digital"
+  ManagedBy   = "Terraform"
+  Environment = "development"
+  Team        = "Platform"
+}

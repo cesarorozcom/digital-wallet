@@ -1,0 +1,53 @@
+# Local Terraform files
+terraform.tfvars
+terraform.tfstate
+terraform.tfstate.*
+.terraform/
+.terraform.lock.hcl
+.terraform.tfstate
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Terraform crash logs
+crash.log
+crash.*.log
+
+# Exclude all .tfvars files by default, including any that might be created with auto-loaded names
+*.tfvars
+*.tfvars.json
+
+# Keep the example file
+!terraform.tfvars.example
+
+# Ignore override files
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Include override files you do wish to add to version control
+!example_override.tf
+
+# Ignore CLI configuration files
+.terraformrc
+terraform.rc
+
+# Ignore plan files
+*.tfplan
+
+# Ignore output files
+*.log
+
+# MAC files
+.DS_Store
