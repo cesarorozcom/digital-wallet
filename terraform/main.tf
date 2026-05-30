@@ -38,11 +38,6 @@ resource "aws_dynamodb_table" "users" {
     type = "S"
   }
 
-  attribute {
-    name = "createdAt"
-    type = "S"
-  }
-
   global_secondary_index {
     name            = "EmailIndex"
     hash_key        = "email"
@@ -153,12 +148,7 @@ resource "aws_dynamodb_table" "refresh_tokens" {
     name = "userId"
     type = "S"
   }
-
-  attribute {
-    name = "expiresAt"
-    type = "N"
-  }
-
+  
   global_secondary_index {
     name            = "UserIdIndex"
     hash_key        = "userId"
@@ -434,46 +424,6 @@ resource "aws_iam_access_key" "backend" {
     aws_iam_user_policy.backend_dynamodb,
     aws_iam_user_policy.backend_s3
   ]
-}
-
-# ============================================================================
-# S3 Event Notification for Lambda (Receipt Processing)
-# ============================================================================
-
-resource "aws_s3_bucket_notification" "receipt_upload" {
-  bucket = aws_s3_bucket.receipts.id
-
-  lambda_function {
-    lambda_function_arn = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:receipt-processor"
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "receipts/"
-    filter_suffix       = ".jpg"
-  }
-
-  lambda_function {
-    lambda_function_arn = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:receipt-processor"
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "receipts/"
-    filter_suffix       = ".jpeg"
-  }
-
-  lambda_function {
-    lambda_function_arn = "arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:receipt-processor"
-    events              = ["s3:ObjectCreated:*"]
-    filter_prefix       = "receipts/"
-    filter_suffix       = ".png"
-  }
-
-  depends_on = [aws_lambda_permission.s3_invoke.id]
-}
-
-# Lambda permission for S3 to invoke
-resource "aws_lambda_permission" "s3_invoke" {
-  statement_id  = "AllowExecutionFromS3Bucket"
-  action        = "lambda:InvokeFunction"
-  function_name = "receipt-processor"
-  principal     = "s3.amazonaws.com"
-  source_arn    = aws_s3_bucket.receipts.arn
 }
 
 # ============================================================================

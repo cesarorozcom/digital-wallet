@@ -1,16 +1,30 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import api from '../services/api';
+import { authService, User } from '../services/api';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
-  const user = JSON.parse(localStorage.getItem('user') || '{}');
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    const userData = localStorage.getItem('user');
+    if (userData) {
+      try {
+        setUser(JSON.parse(userData));
+      } catch (error) {
+        console.error('Error parsing user data:', error);
+        navigate('/login');
+      }
+    }
+  }, [navigate]);
 
   const handleLogout = async () => {
+    setLoading(true);
     try {
-      await api.logout();
-    } catch (err) {
-      console.error('Logout error:', err);
+      await authService.logout();
+    } catch (error) {
+      console.error('Logout error:', error);
     } finally {
       localStorage.removeItem('accessToken');
       localStorage.removeItem('refreshTokenId');
@@ -19,20 +33,29 @@ export default function DashboardPage() {
     }
   };
 
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center h-screen">
+        <p className="text-gray-500">Cargando...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       <nav className="bg-white shadow">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-blue-600">Billetera Digital</h1>
+          <h1 className="text-2xl font-bold text-blue-600">💰 Billetera Digital</h1>
           <div className="flex items-center space-x-4">
-            <span className="text-gray-700">
+            <span className="text-gray-700 text-sm">
               {user.firstName} {user.lastName}
             </span>
             <button
               onClick={handleLogout}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              disabled={loading}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:opacity-50 transition-colors text-sm font-medium"
             >
-              Cerrar sesión
+              {loading ? 'Cerrando...' : 'Cerrar sesión'}
             </button>
           </div>
         </div>
@@ -55,13 +78,13 @@ export default function DashboardPage() {
         </div>
 
         <div className="mt-8 bg-white rounded-lg shadow p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Funciones en desarrollo</h2>
-          <p className="text-gray-600">
-            • Crear transacciones<br />
-            • Capturar recibos<br />
-            • Administrar categorías<br />
-            • Ver reportes mensuales
-          </p>
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Próximas funciones</h2>
+          <ul className="space-y-2 text-gray-600">
+            <li>✓ Crear transacciones</li>
+            <li>✓ Capturar recibos</li>
+            <li>✓ Administrar categorías</li>
+            <li>✓ Ver reportes mensuales</li>
+          </ul>
         </div>
       </main>
     </div>

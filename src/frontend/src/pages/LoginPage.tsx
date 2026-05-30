@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import { authService } from '../services/api';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -15,13 +15,19 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      const response = await api.login({ email, password });
+      console.log('🔐 Attempting login with:', email);
+      const response = await authService.login(email, password);
+
+      console.log('✅ Login successful');
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshTokenId', response.refreshTokenId);
       localStorage.setItem('user', JSON.stringify(response.user));
+
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Login failed. Please try again.');
+      const message = err.message || 'Login failed. Please try again.';
+      console.error('❌ Login error:', message);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -37,7 +43,7 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-700 text-sm">{error}</p>
+                <p className="text-red-700 text-sm font-medium">{error}</p>
               </div>
             )}
 
@@ -51,7 +57,8 @@ export default function LoginPage() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                disabled={loading}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
                 placeholder="tu@email.com"
               />
             </div>
@@ -66,7 +73,8 @@ export default function LoginPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                disabled={loading}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
                 placeholder="••••••••"
               />
             </div>

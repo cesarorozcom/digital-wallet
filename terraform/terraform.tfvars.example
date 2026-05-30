@@ -6,7 +6,7 @@ environment    = "development"
 project_name   = "billetera-digital"
 
 # REQUIRED: Must be globally unique
-s3_bucket_name = "my-unique-billetera-receipts-bucket-12345"
+s3_bucket_name = "ledger-receipts-dev"
 
 # DynamoDB Capacity (adjust based on expected load)
 dynamodb_read_capacity                 = 5

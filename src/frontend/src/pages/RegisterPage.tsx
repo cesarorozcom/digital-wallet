@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import api from '../services/api';
+import { authService } from '../services/api';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
@@ -30,21 +30,32 @@ export default function RegisterPage() {
       return;
     }
 
+    if (formData.password.length < 8) {
+      setError('La contraseña debe tener al menos 8 caracteres');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      const response = await api.register({
+      console.log('📝 Registering:', formData.email);
+      const response = await authService.register({
         email: formData.email,
         password: formData.password,
         firstName: formData.firstName,
         lastName: formData.lastName,
       });
+
+      console.log('✅ Registration successful');
       localStorage.setItem('accessToken', response.accessToken);
       localStorage.setItem('refreshTokenId', response.refreshTokenId);
       localStorage.setItem('user', JSON.stringify(response.user));
+
       navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.error || 'Registration failed. Please try again.');
+      const message = err.message || 'Registration failed. Please try again.';
+      console.error('❌ Registration error:', message);
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -60,7 +71,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-700 text-sm">{error}</p>
+                <p className="text-red-700 text-sm font-medium">{error}</p>
               </div>
             )}
 
@@ -76,7 +87,8 @@ export default function RegisterPage() {
                   value={formData.firstName}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  disabled={loading}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
                   placeholder="Juan"
                 />
               </div>
@@ -91,7 +103,8 @@ export default function RegisterPage() {
                   value={formData.lastName}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                  disabled={loading}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
                   placeholder="Pérez"
                 />
               </div>
@@ -108,7 +121,8 @@ export default function RegisterPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                disabled={loading}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
                 placeholder="tu@email.com"
               />
             </div>
@@ -124,7 +138,8 @@ export default function RegisterPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                disabled={loading}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
                 placeholder="Min. 8 caracteres"
               />
               <p className="mt-1 text-xs text-gray-500">
@@ -143,7 +158,8 @@ export default function RegisterPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                disabled={loading}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
                 placeholder="••••••••"
               />
             </div>

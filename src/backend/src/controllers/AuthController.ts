@@ -1,196 +1,251 @@
 import { Request, Response } from 'express';
-import userService from '../services/UserService';
-import jwtService from '../services/JWTService';
-import dynamoDBService from '../services/DynamoDBService';
+import UserService from '../services/UserService';
+import JWTService from '../services/JWTService';
+import DynamoDBService from '../services/DynamoDBService';
+import { v4 as uuidv4 } from 'uuid';
 
-export class AuthController {
-  private refreshTokensTable = process.env.DYNAMODB_TABLE_REFRESH_TOKENS || 'RefreshTokens';
+interface RegisterRequest {
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
 
-  /**
-   * POST /api/auth/register
-   */
+interface LoginRequest {
+  email: string;
+  password: string;
+}
+
+interface RefreshTokenRequest {
+  refreshTokenId: string;
+}
+
+interface RefreshTokenRecord {
+  tokenId: string;
+  userId: string;
+  hashedToken: string;
+  expiresAt: number;
+  createdAt: string;
+  revokedAt?: string;
+}
+
+interface AuthResponse {
+  accessToken: string;
+  refreshTokenId: string;
+  user: {
+    id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+  };
+}
+
+class AuthController {
   async register(req: Request, res: Response): Promise<void> {
     try {
-      const { email, password, firstName, lastName } = req.body;
+      const { email, password, firstName, lastName } = req.body as RegisterRequest;
 
-      // Validate input
       if (!email || !password || !firstName || !lastName) {
         res.status(400).json({ error: 'Missing required fields' });
         return;
       }
 
-      // Validate password strength
-      const passwordValidation = userService.validatePasswordStrength(password);
-      if (!passwordValidation.valid) {
-        res.status(400).json({
-          error: 'Password does not meet complexity requirements',
-          details: passwordValidation.errors,
-        });
-        return;
-      }
-
-      // Create user
-      const user = await userService.createUser({
+      const user = await UserService.createUser({
         email,
         password,
         firstName,
         lastName,
       });
 
-      // Generate tokens
-      const accessToken = jwtService.generateAccessToken(user.userId, user.email);
-      const refreshTokenData = jwtService.generateRefreshToken();
-      refreshTokenData.userId = user.userId;
+      const accessToken = JWTService.generateAccessToken(
+        user.userId,
+        user.email,
+        user.tokenVersion,
+      );
 
-      // Store refresh token
-      await dynamoDBService.put(this.refreshTokensTable, refreshTokenData);
+      const refreshToken = JWTService.generateRefreshToken();
+      const refreshTokenId = uuidv4();
 
-      res.status(201).json({
-        userId: user.userId,
-        email: user.email,
+      await DynamoDBService.put(
+        process.env.REFRESH_TOKENS_TABLE || 'refreshTokens',
+        {
+          tokenId: refreshTokenId,
+          userId: user.userId,
+          hashedToken: refreshToken.hashedToken,
+          expiresAt: refreshToken.expiresAt,
+          createdAt: new Date().toISOString(),
+        }
+      );
+
+      const response: AuthResponse = {
         accessToken,
-        refreshToken: refreshTokenData.tokenId,
-      });
+        refreshTokenId,
+        user: {
+          id: user.userId,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      };
+
+      res.status(201).json(response);
     } catch (error: any) {
-      console.error('Registration error:', error);
-      res.status(400).json({ error: error.message });
+      console.error('Register error:', error);
+      res.status(400).json({ error: error.message || 'Registration failed' });
     }
   }
 
-  /**
-   * POST /api/auth/login
-   */
   async login(req: Request, res: Response): Promise<void> {
     try {
-      const { email, password } = req.body;
+      const { email, password } = req.body as LoginRequest;
 
       if (!email || !password) {
         res.status(400).json({ error: 'Email and password required' });
         return;
       }
 
-      // Get user
-      const user = await userService.getUserByEmail(email);
+      const user = await UserService.getUserByEmail(email);
       if (!user) {
         res.status(401).json({ error: 'Invalid credentials' });
         return;
       }
 
-      // Verify password
-      const isValid = await userService.verifyPassword(password, user.passwordHash);
-      if (!isValid) {
+      const passwordValid = await UserService.verifyPassword(password, user.passwordHash);
+      if (!passwordValid) {
         res.status(401).json({ error: 'Invalid credentials' });
         return;
       }
 
-      // Generate tokens
-      const accessToken = jwtService.generateAccessToken(user.userId, user.email, user.tokenVersion);
-      const refreshTokenData = jwtService.generateRefreshToken();
-      refreshTokenData.userId = user.userId;
-
-      // Store refresh token
-      await dynamoDBService.put(this.refreshTokensTable, refreshTokenData);
-
-      res.json({
-        userId: user.userId,
-        email: user.email,
-        accessToken,
-        refreshToken: refreshTokenData.tokenId,
-      });
-    } catch (error: any) {
-      console.error('Login error:', error);
-      res.status(500).json({ error: 'Login failed' });
-    }
-  }
-
-  /**
-   * POST /api/auth/logout
-   */
-  async logout(req: Request, res: Response): Promise<void> {
-    try {
-      const userId = req.user?.sub;
-
-      if (!userId) {
-        res.status(401).json({ error: 'Unauthorized' });
-        return;
-      }
-
-      // Get refresh token from body or cookies
-      const { refreshToken } = req.body;
-
-      if (!refreshToken) {
-        res.status(400).json({ error: 'Refresh token required' });
-        return;
-      }
-
-      // Mark refresh token as revoked
-      await dynamoDBService.update(
-        this.refreshTokensTable,
-        { tokenId: refreshToken },
-        'SET revokedAt = :now',
-        { ':now': new Date().toISOString() }
+      const accessToken = JWTService.generateAccessToken(
+        user.userId,
+        user.email,
+        user.tokenVersion,
       );
 
-      res.json({ success: true });
+      const refreshToken = JWTService.generateRefreshToken();
+      const refreshTokenId = uuidv4();
+
+      await DynamoDBService.put(
+        process.env.REFRESH_TOKENS_TABLE || 'refreshTokens',
+        {
+          tokenId: refreshTokenId,
+          userId: user.userId,
+          hashedToken: refreshToken.hashedToken,
+          expiresAt: refreshToken.expiresAt,
+          createdAt: new Date().toISOString(),
+        }
+      );
+
+      const response: AuthResponse = {
+        accessToken,
+        refreshTokenId,
+        user: {
+          id: user.userId,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+        },
+      };
+
+      res.json(response);
     } catch (error: any) {
-      console.error('Logout error:', error);
-      res.status(500).json({ error: 'Logout failed' });
+      console.error('Login error:', error);
+      res.status(401).json({ error: error.message || 'Login failed' });
     }
   }
 
-  /**
-   * POST /api/auth/refresh-token
-   */
-  async refreshToken(req: Request, res: Response): Promise<void> {
+  async logout(req: Request, res: Response): Promise<void> {
     try {
-      const { refreshToken } = req.body;
+      const { refreshTokenId } = req.body as { refreshTokenId?: string };
 
-      if (!refreshToken) {
-        res.status(400).json({ error: 'Refresh token required' });
+      if (!refreshTokenId) {
+        res.status(400).json({ error: 'Refresh token ID required' });
         return;
       }
 
-      // Get refresh token from DB
-      const storedToken = await dynamoDBService.get(this.refreshTokensTable, {
-        tokenId: refreshToken,
-      });
+      // Mark token as revoked
+      await DynamoDBService.update(
+        process.env.REFRESH_TOKENS_TABLE || 'refreshTokens',
+        { tokenId: refreshTokenId },
+        { revokedAt: new Date().toISOString() }
+      );
 
-      if (!storedToken) {
+      res.json({ message: 'Logout successful' });
+    } catch (error: any) {
+      console.error('Logout error:', error);
+      res.status(400).json({ error: error.message || 'Logout failed' });
+    }
+  }
+
+  async refreshToken(req: Request, res: Response): Promise<void> {
+    try {
+      const { refreshTokenId } = req.body as RefreshTokenRequest;
+
+      if (!refreshTokenId) {
+        res.status(400).json({ error: 'Refresh token ID required' });
+        return;
+      }
+
+      // Get refresh token from DynamoDB
+      const tokenRecord = await DynamoDBService.get(
+        process.env.REFRESH_TOKENS_TABLE || 'refreshTokens',
+        { tokenId: refreshTokenId }
+      );
+
+      if (!tokenRecord) {
         res.status(401).json({ error: 'Invalid refresh token' });
         return;
       }
 
+      const token = tokenRecord as RefreshTokenRecord;
+
       // Check if revoked
-      if (storedToken.revokedAt) {
+      if (token.revokedAt) {
         res.status(401).json({ error: 'Token has been revoked' });
         return;
       }
 
       // Check if expired
-      const expiresAt = new Date(storedToken.expiresAt);
-      if (expiresAt < new Date()) {
+      if (Date.now() > token.expiresAt * 1000) {
         res.status(401).json({ error: 'Refresh token expired' });
         return;
       }
 
-      // Get user to get current tokenVersion
-      const user = await userService.getUser(storedToken.userId);
+      // Get user to verify they still exist
+      const user = await DynamoDBService.get(
+        process.env.USERS_TABLE || 'users',
+        { userId: token.userId }
+      );
+
       if (!user) {
         res.status(401).json({ error: 'User not found' });
         return;
       }
 
+      const userData = user as any;
+
       // Generate new access token
-      const accessToken = jwtService.generateAccessToken(
-        user.userId,
-        user.email,
-        user.tokenVersion
+      const accessToken = JWTService.generateAccessToken(
+        userData.userId,
+        userData.email,
+        userData.tokenVersion,
       );
 
-      res.json({ accessToken });
+      const response: AuthResponse = {
+        accessToken,
+        refreshTokenId,
+        user: {
+          id: userData.userId,
+          email: userData.email,
+          firstName: userData.firstName,
+          lastName: userData.lastName,
+        },
+      };
+
+      res.json(response);
     } catch (error: any) {
       console.error('Refresh token error:', error);
-      res.status(500).json({ error: 'Token refresh failed' });
+      res.status(401).json({ error: error.message || 'Token refresh failed' });
     }
   }
 }
