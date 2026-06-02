@@ -4,6 +4,7 @@ declare const process: {
   env: {
     REACT_APP_API_BASE_URL?: string;
     REACT_APP_API_PATH?: string;
+    ENVIRONMENT?: 'development' | 'production' | 'test';
   };
 };
 
@@ -11,7 +12,11 @@ const API_BASE = process.env.REACT_APP_API_BASE_URL || 'http://localhost:3000';
 const API_PATH = process.env.REACT_APP_API_PATH || '/api';
 const API_URL = `${API_BASE}${API_PATH}`;
 
-console.log('🌐 API Configuration:', { API_BASE, API_PATH, API_URL });
+if (process.env.ENVIRONMENT === 'development') {
+  console.log('🚀 Running in development mode');
+  console.log('🌐 API Configuration:', { API_BASE, API_PATH, API_URL });
+}
+
 
 const api = axios.create({
   baseURL: API_URL,

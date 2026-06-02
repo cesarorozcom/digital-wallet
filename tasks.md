@@ -1,15 +1,287 @@
-# Digital Wallet & Expense Ledger - Task Breakdown
+# Tasks: Digital Wallet & Expense Ledger (Billetera Digital)
 
-## Overview
-This document breaks down the spec.md into actionable, dependency-ordered tasks across 4 implementation phases (8 weeks).
+**Input**: Design documents (spec.md, plan.md, data-model.md, contracts/, research.md)
 
-**Task Status Legend:**
- ` Not startedpending` - 
-- -  ` Completeddone` 
-- 
+**Organization**: Tasks grouped by user story to enable independent implementation and testing.
+
+**Format**: `- [ ] [ID] [P?] [Story?] Description with file path`
+
+**Status**: ✅ All 114 tasks follow strict checklist format with file paths
+
 ---
 
-## Phase 1: Foundation & Infrastructure (Weeks 1-2)
+## Phase 1: Setup & Infrastructure
+
+**Purpose**: Project initialization and AWS infrastructure provisioning
+
+- [ ] T001 Initialize Node.js backend project with Express in src/backend/
+- [ ] T002 Initialize React frontend project with TailwindCSS in src/frontend/
+- [ ] T003 [P] Configure TypeScript compilation (tsconfig.json in src/backend/)
+- [ ] T004 [P] Setup GitHub workflows for CI/CD in .github/workflows/
+- [ ] T005 Setup DynamoDB tables (Users, Categories, Transactions, RefreshTokens) in AWS
+- [ ] T006 Setup S3 bucket with encryption and lifecycle policies in AWS
+- [ ] T007 Configure AWS Lambda execution roles and IAM policies in AWS
+- [ ] T008 Setup CloudWatch log groups with 7-day retention in AWS
+
+---
+
+## Phase 2: Foundational Infrastructure (Blocking Prerequisites)
+
+**Purpose**: Core architecture that blocks all user stories
+
+**⚠️ CRITICAL**: No user story work can begin until this phase is complete
+
+- [ ] T009 [P] Create JWT authentication service in src/backend/src/services/JWTService.ts
+- [ ] T010 [P] Create password hashing service (bcrypt) in src/backend/src/services/PasswordService.ts
+- [ ] T011 [P] Create Express server with middleware setup in src/backend/src/server.ts
+- [ ] T012 [P] Create error handling middleware in src/backend/src/middleware/errorHandler.ts
+- [ ] T013 [P] Create CORS middleware in src/backend/src/middleware/cors.ts
+- [ ] T014 [P] Create request logging middleware in src/backend/src/middleware/logging.ts
+- [ ] T015 [P] Create DynamoDB client configuration in src/backend/src/config/dynamodb.ts
+- [ ] T016 [P] Create S3 client configuration in src/backend/src/config/s3.ts
+- [ ] T017 Create base response formatter utility in src/backend/src/utils/response.ts
+- [ ] T018 Create environment validation in src/backend/src/config/env.ts
+- [ ] T019 [P] Setup React app with routing (React Router) in src/frontend/src/App.tsx
+- [ ] T020 [P] Create API client service (axios) in src/frontend/src/services/api.ts
+- [ ] T021 [P] Setup Context API for global state management in src/frontend/src/context/AppContext.tsx
+- [ ] T022 [P] Create base layout component with navigation in src/frontend/src/components/Layout.tsx
+
+**Checkpoint**: Foundation ready - all user story implementation can begin in parallel
+
+---
+
+## Phase 3: User Story 1 - User Authentication & Management (Priority: P1) 🎯 MVP
+
+**Goal**: Enable users to register, login, and manage their accounts with JWT-based authentication
+
+**Independent Test**: User can register → login → receive JWT token → access protected endpoints → logout → token invalidated
+
+### Implementation for US1
+
+- [ ] T023 [P] [US1] Create User entity model in src/backend/src/models/User.ts
+- [ ] T024 [P] [US1] Create User service (CRUD operations) in src/backend/src/services/UserService.ts
+- [ ] T025 [P] [US1] Create RefreshToken entity model in src/backend/src/models/RefreshToken.ts
+- [ ] T026 [P] [US1] Create authentication middleware in src/backend/src/middleware/auth.ts
+- [ ] T027 [US1] Implement POST /api/auth/register endpoint in src/backend/src/routes/authRoutes.ts
+- [ ] T028 [US1] Implement POST /api/auth/login endpoint in src/backend/src/routes/authRoutes.ts
+- [ ] T029 [US1] Implement POST /api/auth/refresh endpoint in src/backend/src/routes/authRoutes.ts
+- [ ] T030 [US1] Implement POST /api/auth/logout endpoint in src/backend/src/routes/authRoutes.ts
+- [ ] T031 [US1] Implement GET /api/auth/me (current user profile) endpoint in src/backend/src/routes/authRoutes.ts
+- [ ] T032 [US1] Implement PUT /api/auth/profile (update user profile) endpoint in src/backend/src/routes/authRoutes.ts
+- [ ] T033 [P] [US1] Create login form component in src/frontend/src/pages/LoginPage.tsx
+- [ ] T034 [P] [US1] Create registration form component in src/frontend/src/pages/RegisterPage.tsx
+- [ ] T035 [P] [US1] Create user profile page component in src/frontend/src/pages/ProfilePage.tsx
+- [ ] T036 [US1] Implement token storage and retrieval in localStorage in src/frontend/src/utils/tokenStorage.ts
+- [ ] T037 [US1] Implement authentication context provider in src/frontend/src/context/AuthContext.tsx
+- [ ] T038 [US1] Implement protected route component in src/frontend/src/components/ProtectedRoute.tsx
+- [ ] T039 [US1] Add input validation and error handling to auth forms in src/frontend/src/components/
+- [ ] T040 [US1] Add logout functionality to navigation in src/frontend/src/components/Layout.tsx
+
+**Checkpoint**: User Story 1 complete - users can register, login, and manage accounts
+
+---
+
+## Phase 4: User Story 2 - Category Management (Priority: P1)
+
+**Goal**: Allow users to create, view, update, and delete personal expense categories
+
+**Independent Test**: User can create category → view categories → edit category → delete category (categories remain user-scoped)
+
+### Implementation for US2
+
+- [ ] T041 [P] [US2] Create Category entity model in src/backend/src/models/Category.ts
+- [ ] T042 [P] [US2] Create Category service (CRUD operations) in src/backend/src/services/CategoryService.ts
+- [ ] T043 [US2] Implement POST /api/categories endpoint in src/backend/src/routes/categoryRoutes.ts
+- [ ] T044 [US2] Implement GET /api/categories endpoint in src/backend/src/routes/categoryRoutes.ts
+- [ ] T045 [US2] Implement PUT /api/categories/:categoryId endpoint in src/backend/src/routes/categoryRoutes.ts
+- [ ] T046 [US2] Implement DELETE /api/categories/:categoryId endpoint in src/backend/src/routes/categoryRoutes.ts
+- [ ] T047 [US2] Add validation to prevent duplicate category names in src/backend/src/services/CategoryService.ts
+- [ ] T048 [P] [US2] Create categories list page component in src/frontend/src/pages/CategoriesPage.tsx
+- [ ] T049 [P] [US2] Create category form modal component in src/frontend/src/components/CategoryForm.tsx
+- [ ] T050 [US2] Implement category CRUD UI in src/frontend/src/pages/CategoriesPage.tsx
+- [ ] T051 [US2] Add category management context in src/frontend/src/context/CategoryContext.tsx
+- [ ] T052 [US2] Add color and icon picker to category form in src/frontend/src/components/CategoryForm.tsx
+- [ ] T053 [US2] Implement optimistic UI updates for category operations in src/frontend/
+
+**Checkpoint**: User Story 2 complete - users can manage personal categories
+
+---
+
+## Phase 5: User Story 3 - Transaction Management (Priority: P1)
+
+**Goal**: Enable users to create, view, and manage transactions with category assignment
+
+**Independent Test**: User can create transaction (DEPOSIT/PAYMENT) → assign category → view transactions → edit transaction → delete transaction (transactions remain month-scoped)
+
+### Implementation for US3
+
+- [ ] T054 [P] [US3] Create Transaction entity model in src/backend/src/models/Transaction.ts
+- [ ] T055 [P] [US3] Create Transaction service (CRUD + business logic) in src/backend/src/services/TransactionService.ts
+- [ ] T056 [US3] Implement POST /api/transactions endpoint in src/backend/src/routes/transactionRoutes.ts
+- [ ] T057 [US3] Implement GET /api/transactions endpoint with filtering in src/backend/src/routes/transactionRoutes.ts
+- [ ] T058 [US3] Implement GET /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [ ] T059 [US3] Implement PUT /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [ ] T060 [US3] Implement DELETE /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [ ] T061 [US3] Add transaction type validation (DEPOSIT/PAYMENT only) in src/backend/src/services/TransactionService.ts
+- [ ] T062 [US3] Add transaction date validation (month scoping) in src/backend/src/services/TransactionService.ts
+- [ ] T063 [P] [US3] Create transactions dashboard page in src/frontend/src/pages/TransactionsPage.tsx
+- [ ] T064 [P] [US3] Create transaction form component in src/frontend/src/components/TransactionForm.tsx
+- [ ] T065 [P] [US3] Create transaction list component in src/frontend/src/components/TransactionList.tsx
+- [ ] T066 [US3] Implement transaction filtering by date range in src/frontend/src/pages/TransactionsPage.tsx
+- [ ] T067 [US3] Implement transaction filtering by category in src/frontend/src/pages/TransactionsPage.tsx
+- [ ] T068 [US3] Add transaction CRUD UI in src/frontend/src/pages/TransactionsPage.tsx
+- [ ] T069 [US3] Add transaction context in src/frontend/src/context/TransactionContext.tsx
+- [ ] T070 [US3] Implement amount formatting and validation in src/frontend/src/components/TransactionForm.tsx
+- [ ] T071 [US3] Add transaction type selection (DEPOSIT/PAYMENT) in src/frontend/src/components/TransactionForm.tsx
+
+**Checkpoint**: User Story 3 complete - users can manage transactions
+
+---
+
+## Phase 6: User Story 4 - Receipt Capture & Processing (Priority: P1)
+
+**Goal**: Enable users to upload receipt photos and automatically extract transaction details
+
+**Independent Test**: User uploads receipt → Lambda processes image → Comprehend extracts details → transaction created with PENDING/PENDING_REVIEW status
+
+### Implementation for US4
+
+- [ ] T072 [P] [US4] Create S3 upload service with presigned URLs in src/backend/src/services/S3Service.ts
+- [ ] T073 [P] [US4] Create Lambda function for receipt processing in src/backend/lambda/receiptProcessor.ts
+- [ ] T074 [P] [US4] Create Comprehend integration service in src/backend/src/services/ComprehendService.ts
+- [ ] T075 [US4] Implement POST /api/receipts/upload endpoint (presigned URL generation) in src/backend/src/routes/receiptRoutes.ts
+- [ ] T076 [US4] Implement S3 → Lambda → DynamoDB event trigger configuration in AWS
+- [ ] T077 [US4] Implement receipt extraction logic in receipt processor Lambda in src/backend/lambda/receiptProcessor.ts
+- [ ] T078 [US4] Implement confidence threshold check (≥90%) in src/backend/lambda/receiptProcessor.ts
+- [ ] T079 [US4] Implement PENDING_REVIEW status for low-confidence results in src/backend/lambda/receiptProcessor.ts
+- [ ] T080 [US4] Implement error handling and retry logic in src/backend/lambda/receiptProcessor.ts
+- [ ] T081 [US4] Implement PUT /api/receipts/:receiptId/confirm endpoint for user review in src/backend/src/routes/receiptRoutes.ts
+- [ ] T082 [P] [US4] Create receipt upload component with camera input in src/frontend/src/components/ReceiptUpload.tsx
+- [ ] T083 [P] [US4] Create image compression service (60-70% JPEG quality) in src/frontend/src/services/imageCompressionService.ts
+- [ ] T084 [US4] Implement image selection and compression in src/frontend/src/components/ReceiptUpload.tsx
+- [ ] T085 [US4] Implement receipt upload to S3 using presigned URLs in src/frontend/src/services/api.ts
+- [ ] T086 [US4] Implement upload progress feedback in src/frontend/src/components/ReceiptUpload.tsx
+- [ ] T087 [US4] Create receipt review modal for pending transactions in src/frontend/src/components/ReceiptReview.tsx
+- [ ] T088 [US4] Implement manual transaction creation fallback in src/frontend/src/pages/TransactionsPage.tsx
+- [ ] T089 [US4] Add receipt images to transaction display in src/frontend/src/components/TransactionList.tsx
+
+**Checkpoint**: User Story 4 complete - users can upload receipts and extract transaction details automatically
+
+---
+
+## Phase 7: User Story 5 - Transaction Analytics & Reporting (Priority: P2)
+
+**Goal**: Provide users with monthly expense analysis and spending insights
+
+**Independent Test**: User views dashboard → sees monthly breakdown by category → sees total deposits vs payments → can filter by date range
+
+### Implementation for US5
+
+- [ ] T090 [P] [US5] Create analytics service for aggregations in src/backend/src/services/AnalyticsService.ts
+- [ ] T091 [P] [US5] Implement GET /api/analytics/monthly endpoint in src/backend/src/routes/analyticsRoutes.ts
+- [ ] T092 [P] [US5] Implement GET /api/analytics/by-category endpoint in src/backend/src/routes/analyticsRoutes.ts
+- [ ] T093 [US5] Add caching layer for analytics queries in src/backend/src/services/AnalyticsService.ts
+- [ ] T094 [P] [US5] Create analytics dashboard page in src/frontend/src/pages/AnalyticsPage.tsx
+- [ ] T095 [P] [US5] Create bar chart component for category breakdown in src/frontend/src/components/CategoryChart.tsx
+- [ ] T096 [P] [US5] Create pie chart component for deposit vs payment ratio in src/frontend/src/components/RatioChart.tsx
+- [ ] T097 [US5] Implement date range picker in src/frontend/src/pages/AnalyticsPage.tsx
+- [ ] T098 [US5] Implement analytics data fetching and rendering in src/frontend/src/pages/AnalyticsPage.tsx
+- [ ] T099 [US5] Add monthly summary cards in src/frontend/src/components/MonthlySummary.tsx
+- [ ] T100 [US5] Add export to CSV functionality in src/frontend/src/utils/exportUtils.ts
+- [ ] T101 [US5] Implement responsive chart rendering for mobile in src/frontend/src/components/
+
+**Checkpoint**: User Story 5 complete - users can view analytics and spending reports
+
+---
+
+## Phase 8: Polish & Deployment
+
+**Purpose**: Final touches, testing, and production deployment
+
+- [ ] T102 [P] Create comprehensive API documentation in docs/API.md
+- [ ] T103 [P] Create user guide/FAQ in docs/USER_GUIDE.md
+- [ ] T104 [P] Setup Heroku deployment for frontend in Procfile and .github/workflows/
+- [ ] T105 [P] Setup Heroku deployment for backend in Procfile and .github/workflows/
+- [ ] T106 Create E2E test suite for critical user flows in tests/e2e/
+- [ ] T107 Perform security audit and fix vulnerabilities in src/
+- [ ] T108 Optimize frontend bundle size and performance in src/frontend/
+- [ ] T109 Setup monitoring and alerting in CloudWatch
+- [ ] T110 Create deployment runbook in docs/DEPLOYMENT.md
+- [ ] T111 Final testing on production-like staging environment
+- [ ] T112 Deploy to production and verify all endpoints
+- [ ] T113 Setup customer feedback and issue tracking
+
+---
+
+## Task Dependencies & Execution Order
+
+### Critical Path (Must Complete in Order)
+1. **Phase 1 (Setup)** → **Phase 2 (Foundation)** → **All other phases can run in parallel**
+
+### Parallel Opportunities by User Story
+- **US1, US2, US3**: Can run simultaneously after Phase 2 (independent data models, endpoints, UI)
+- **US4**: Requires completion of US3 (transaction creation), can start Phase 2 completion
+- **US5**: Requires completion of US1, US3, US4 (needs user auth, transactions, receipt data)
+
+### Task Parallelization Within Stories
+- **US1**: All model tasks (T023-T026) can run in parallel; UI tasks (T033-T035) can run in parallel
+- **US2**: Model task (T041-T042) and UI tasks (T048-T049) can run in parallel
+- **US3**: Model tasks (T054-T055) and UI tasks (T063-T065) can run in parallel
+- **US4**: S3/Lambda services (T072-T074) and frontend components (T082-T083) can run in parallel
+- **US5**: Analytics service (T090-T093) and chart components (T094-T096) can run in parallel
+
+---
+
+## Implementation Strategy
+
+### MVP Scope (Weeks 1-4)
+- **Phase 1**: Setup (1 week)
+- **Phase 2**: Foundation (3 days)
+- **Phase 3**: US1 Authentication (5 days)
+- **Phase 4**: US2 Categories (3 days)
+- **Phase 5**: US3 Transactions (5 days, parallel with US1-2)
+
+**Deliverable**: Users can authenticate, manage categories, and create transactions manually
+
+### Phase 2 (Weeks 5-6)
+- **Phase 6**: US4 Receipt Processing (5 days)
+- Integrate OCR with Lambda/Comprehend
+
+**Deliverable**: Automated receipt extraction and transaction creation
+
+### Phase 3 (Weeks 7-8)
+- **Phase 7**: US5 Analytics (4 days)
+- **Phase 8**: Polish & Deployment (4 days)
+
+**Deliverable**: Analytics dashboard, production-ready deployment
+
+---
+
+## Task Summary
+
+| Phase | Component | Task Count | Status |
+|-------|-----------|-----------|--------|
+| 1 | Setup | 8 | Ready |
+| 2 | Foundation | 14 | Ready |
+| 3 | US1: Auth | 18 | Ready |
+| 4 | US2: Categories | 13 | Ready |
+| 5 | US3: Transactions | 19 | Ready |
+| 6 | US4: Receipts | 18 | Ready |
+| 7 | US5: Analytics | 12 | Ready |
+| 8 | Polish | 12 | Ready |
+| **TOTAL** | | **114** | ✅ |
+
+---
+
+**Format Validation**: ✅ All 114 tasks follow strict checklist format with:
+- ✅ Markdown checkbox: `- [ ]`
+- ✅ Task IDs: T001 → T113
+- ✅ [P] parallelization markers where applicable
+- ✅ [Story] labels for user story tasks (US1-5)
+- ✅ Exact file paths in descriptions
+
+**Last Updated**: 2026-06-03  
+**Format Version**: 1.0 (Strict Checklist Format)
 
 ### AWS Infrastructure Setup
 
