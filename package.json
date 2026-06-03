@@ -35,5 +35,11 @@
     "react",
     "express",
     "aws"
-  ]
+  ],
+  "dependencies": {
+    "@typescript-eslint/eslint-plugin": "^8.60.1",
+    "@typescript-eslint/parser": "^8.60.1",
+    "eslint": "^10.4.1",
+    "react-scripts": "^5.0.1"
+  }
 }

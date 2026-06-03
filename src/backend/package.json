@@ -7,9 +7,6 @@
     "dev": "ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
-    "lint": "eslint src --ext .ts",
-    "format": "prettier --write \"src/**/*.ts\"",
-    "type-check": "tsc --noEmit",
     "postinstall": "npm run build"
   },
   "keywords": [
@@ -47,6 +44,6 @@
     "typescript": "^5.2.2"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": "18.0.0"
   }
 }

@@ -1,9 +1,13 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { authService } from '../services/api';
+import AuthField from '../components/auth/AuthField';
+import AuthMessage from '../components/auth/AuthMessage';
+import { validateRegisterForm } from '../components/auth/validation';
+import { useAuthContext } from '../context/AuthContext';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { isAuthLoading, register } = useAuthContext();
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -11,7 +15,6 @@ export default function RegisterPage() {
     password: '',
     confirmPassword: '',
   });
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -25,39 +28,24 @@ export default function RegisterPage() {
     e.preventDefault();
     setError('');
 
-    if (formData.password !== formData.confirmPassword) {
-      setError('Las contraseñas no coinciden');
+    const validationError = validateRegisterForm(formData);
+    if (validationError) {
+      setError(validationError);
       return;
     }
-
-    if (formData.password.length < 8) {
-      setError('La contraseña debe tener al menos 8 caracteres');
-      return;
-    }
-
-    setLoading(true);
 
     try {
-      console.log('📝 Registering:', formData.email);
-      const response = await authService.register({
-        email: formData.email,
+      await register({
+        email: formData.email.trim(),
         password: formData.password,
-        firstName: formData.firstName,
-        lastName: formData.lastName,
+        firstName: formData.firstName.trim(),
+        lastName: formData.lastName.trim(),
       });
-
-      console.log('✅ Registration successful');
-      localStorage.setItem('accessToken', response.accessToken);
-      localStorage.setItem('refreshTokenId', response.refreshTokenId);
-      localStorage.setItem('user', JSON.stringify(response.user));
-
       navigate('/dashboard');
     } catch (err: any) {
       const message = err.message || 'Registration failed. Please try again.';
       console.error('❌ Registration error:', message);
       setError(message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -69,107 +57,74 @@ export default function RegisterPage() {
           <p className="text-gray-600 mb-8">Comienza a gestionar tus finanzas</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-700 text-sm font-medium">{error}</p>
-              </div>
-            )}
+            {error ? <AuthMessage message={error} /> : null}
 
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Nombre
-                </label>
-                <input
-                  id="firstName"
-                  type="text"
-                  name="firstName"
-                  value={formData.firstName}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-                  placeholder="Juan"
-                />
-              </div>
-              <div>
-                <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-1">
-                  Apellido
-                </label>
-                <input
-                  id="lastName"
-                  type="text"
-                  name="lastName"
-                  value={formData.lastName}
-                  onChange={handleChange}
-                  required
-                  disabled={loading}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-                  placeholder="Pérez"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                name="email"
-                value={formData.email}
+              <AuthField
+                id="firstName"
+                label="Nombre"
+                name="firstName"
+                value={formData.firstName}
                 onChange={handleChange}
                 required
-                disabled={loading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-                placeholder="tu@email.com"
+                disabled={isAuthLoading}
+                placeholder="Juan"
+              />
+              <AuthField
+                id="lastName"
+                label="Apellido"
+                name="lastName"
+                value={formData.lastName}
+                onChange={handleChange}
+                required
+                disabled={isAuthLoading}
+                placeholder="Pérez"
               />
             </div>
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Contraseña
-              </label>
-              <input
-                id="password"
-                type="password"
-                name="password"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-                placeholder="Min. 8 caracteres"
-              />
-              <p className="mt-1 text-xs text-gray-500">
-                Mínimo 8 caracteres, una mayúscula, un número y un carácter especial
-              </p>
-            </div>
+            <AuthField
+              id="email"
+              type="email"
+              label="Email"
+              name="email"
+              value={formData.email}
+              onChange={handleChange}
+              required
+              disabled={isAuthLoading}
+              placeholder="tu@email.com"
+            />
 
-            <div>
-              <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700 mb-1">
-                Confirmar contraseña
-              </label>
-              <input
-                id="confirmPassword"
-                type="password"
-                name="confirmPassword"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                disabled={loading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-                placeholder="••••••••"
-              />
-            </div>
+            <AuthField
+              id="password"
+              type="password"
+              label="Contraseña"
+              name="password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              disabled={isAuthLoading}
+              placeholder="Min. 8 caracteres"
+              hint="Mínimo 8 caracteres, una mayúscula, un número y un carácter especial"
+            />
+
+            <AuthField
+              id="confirmPassword"
+              type="password"
+              label="Confirmar contraseña"
+              name="confirmPassword"
+              value={formData.confirmPassword}
+              onChange={handleChange}
+              required
+              disabled={isAuthLoading}
+              placeholder="••••••••"
+            />
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isAuthLoading}
               className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Creando cuenta...' : 'Registrarse'}
+              {isAuthLoading ? 'Creando cuenta...' : 'Registrarse'}
             </button>
           </form>
 

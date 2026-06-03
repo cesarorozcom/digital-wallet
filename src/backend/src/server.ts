@@ -1,7 +1,8 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import authRoutes from './routes/auth';
+import authRoutes from './routes/authRoutes';
+import categoryRoutes from './routes/categoryRoutes';
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
@@ -47,6 +48,7 @@ app.get('/', (req: Request, res: Response) => {
 
 // API Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/categories', categoryRoutes);
 
 // Routes list
 app.get('/api/routes', (req: Request, res: Response) => {
@@ -55,7 +57,14 @@ app.get('/api/routes', (req: Request, res: Response) => {
       'POST /api/auth/register',
       'POST /api/auth/login',
       'POST /api/auth/logout',
+      'POST /api/auth/refresh',
       'POST /api/auth/refresh-token',
+      'GET /api/auth/me',
+      'PUT /api/auth/profile',
+      'POST /api/categories',
+      'GET /api/categories',
+      'PUT /api/categories/:categoryId',
+      'DELETE /api/categories/:categoryId',
     ],
   });
 });

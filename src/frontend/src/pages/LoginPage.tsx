@@ -1,35 +1,34 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { authService } from '../services/api';
+import AuthField from '../components/auth/AuthField';
+import AuthMessage from '../components/auth/AuthMessage';
+import { validateLoginForm } from '../components/auth/validation';
+import { useAuthContext } from '../context/AuthContext';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const { isAuthLoading, login } = useAuthContext();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true);
+
+    const validationError = validateLoginForm(email, password);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
 
     try {
-      console.log('🔐 Attempting login with:', email);
-      const response = await authService.login(email, password);
-
-      console.log('✅ Login successful');
-      localStorage.setItem('accessToken', response.accessToken);
-      localStorage.setItem('refreshTokenId', response.refreshTokenId);
-      localStorage.setItem('user', JSON.stringify(response.user));
-
+      await login(email.trim(), password);
       navigate('/dashboard');
     } catch (err: any) {
       const message = err.message || 'Login failed. Please try again.';
       console.error('❌ Login error:', message);
       setError(message);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -41,50 +40,36 @@ export default function LoginPage() {
           <p className="text-gray-600 mb-8">Gestiona tus finanzas familiares</p>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                <p className="text-red-700 text-sm font-medium">{error}</p>
-              </div>
-            )}
+            {error ? <AuthMessage message={error} /> : null}
 
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                required
-                disabled={loading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-                placeholder="tu@email.com"
-              />
-            </div>
+            <AuthField
+              id="email"
+              type="email"
+              label="Email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              required
+              disabled={isAuthLoading}
+              placeholder="tu@email.com"
+            />
 
-            <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-1">
-                Contraseña
-              </label>
-              <input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                disabled={loading}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none disabled:opacity-50"
-                placeholder="••••••••"
-              />
-            </div>
+            <AuthField
+              id="password"
+              type="password"
+              label="Contraseña"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+              disabled={isAuthLoading}
+              placeholder="••••••••"
+            />
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={isAuthLoading}
               className="w-full py-2 px-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              {loading ? 'Cargando...' : 'Iniciar sesión'}
+              {isAuthLoading ? 'Cargando...' : 'Iniciar sesión'}
             </button>
           </form>
 

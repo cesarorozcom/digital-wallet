@@ -1,24 +1,7 @@
 import DynamoDBService from './DynamoDBService';
-import * as bcrypt from 'bcrypt';
 import { v4 as uuidv4 } from 'uuid';
-
-interface User {
-  userId: string;
-  email: string;
-  firstName: string;
-  lastName: string;
-  passwordHash: string;
-  tokenVersion: number;
-  createdAt: string;
-  updatedAt: string;
-}
-
-interface CreateUserParams {
-  email: string;
-  password: string;
-  firstName: string;
-  lastName: string;
-}
+import PasswordService from './PasswordService';
+import { CreateUserParams, User } from '../models/User';
 
 class UserService {
   private tableName = process.env.USERS_TABLE || 'users';
@@ -39,7 +22,7 @@ class UserService {
     }
 
     // Hash password
-    const passwordHash = await bcrypt.hash(password, 12);
+    const passwordHash = await PasswordService.hash(password);
 
     const user: User = {
       userId: uuidv4(),
@@ -92,7 +75,7 @@ class UserService {
    * Verify password
    */
   async verifyPassword(password: string, hash: string): Promise<boolean> {
-    return bcrypt.compare(password, hash);
+    return PasswordService.compare(password, hash);
   }
 
   /**
