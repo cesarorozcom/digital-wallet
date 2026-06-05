@@ -96,7 +96,7 @@ heroku git:remote -a billetera-backend
 cd src/backend
 
 # Deploy
-git push heroku main
+git push heroku master
 
 # View logs
 heroku logs -a billetera-backend --tail

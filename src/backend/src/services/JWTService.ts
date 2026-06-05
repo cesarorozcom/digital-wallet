@@ -14,7 +14,7 @@ export interface RefreshTokenData {
   tokenId: string;
   userId: string;
   hashedToken: string;
-  expiresAt: string;
+  expiresAt: number;
   createdAt: string;
   revokedAt?: string;
 }
@@ -55,7 +55,7 @@ export class JWTService {
    */
   generateRefreshToken(): RefreshTokenData {
     const tokenId = uuidv4();
-    const expiresAt = new Date(Date.now() + this.refreshTokenExpiry * 1000).toISOString();
+    const expiresAt = Math.floor(Date.now() / 1000) + this.refreshTokenExpiry;
 
     return {
       tokenId,

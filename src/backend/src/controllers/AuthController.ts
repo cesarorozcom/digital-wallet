@@ -2,7 +2,8 @@ import { Request, Response } from 'express';
 import UserService from '../services/UserService';
 import JWTService from '../services/JWTService';
 import DynamoDBService from '../services/DynamoDBService';
-import { v4 as uuidv4 } from 'uuid';
+import { RefreshToken } from '../models/RefreshToken';
+import { PublicUser, toPublicUser } from '../models/User';
 
 interface RegisterRequest {
   email: string;
@@ -20,27 +21,23 @@ interface RefreshTokenRequest {
   refreshTokenId: string;
 }
 
-interface RefreshTokenRecord {
-  tokenId: string;
-  userId: string;
-  hashedToken: string;
-  expiresAt: number;
-  createdAt: string;
-  revokedAt?: string;
+interface UpdateProfileRequest {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
 }
 
 interface AuthResponse {
   accessToken: string;
   refreshTokenId: string;
-  user: {
-    id: string;
-    email: string;
-    firstName: string;
-    lastName: string;
-  };
+  user: PublicUser;
 }
 
 class AuthController {
+  private getAuthenticatedUserId(req: Request): string | null {
+    return req.user?.sub || null;
+  }
+
   async register(req: Request, res: Response): Promise<void> {
     try {
       const { email, password, firstName, lastName } = req.body as RegisterRequest;
@@ -64,28 +61,17 @@ class AuthController {
       );
 
       const refreshToken = JWTService.generateRefreshToken();
-      const refreshTokenId = uuidv4();
+      refreshToken.userId = user.userId;
 
       await DynamoDBService.put(
         process.env.REFRESH_TOKENS_TABLE || 'refreshTokens',
-        {
-          tokenId: refreshTokenId,
-          userId: user.userId,
-          hashedToken: refreshToken.hashedToken,
-          expiresAt: refreshToken.expiresAt,
-          createdAt: new Date().toISOString(),
-        }
+        refreshToken
       );
 
       const response: AuthResponse = {
         accessToken,
-        refreshTokenId,
-        user: {
-          id: user.userId,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
+        refreshTokenId: refreshToken.tokenId,
+        user: toPublicUser(user),
       };
 
       res.status(201).json(response);
@@ -123,28 +109,17 @@ class AuthController {
       );
 
       const refreshToken = JWTService.generateRefreshToken();
-      const refreshTokenId = uuidv4();
+      refreshToken.userId = user.userId;
 
       await DynamoDBService.put(
         process.env.REFRESH_TOKENS_TABLE || 'refreshTokens',
-        {
-          tokenId: refreshTokenId,
-          userId: user.userId,
-          hashedToken: refreshToken.hashedToken,
-          expiresAt: refreshToken.expiresAt,
-          createdAt: new Date().toISOString(),
-        }
+        refreshToken
       );
 
       const response: AuthResponse = {
         accessToken,
-        refreshTokenId,
-        user: {
-          id: user.userId,
-          email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
-        },
+        refreshTokenId: refreshToken.tokenId,
+        user: toPublicUser(user),
       };
 
       res.json(response);
@@ -197,7 +172,7 @@ class AuthController {
         return;
       }
 
-      const token = tokenRecord as RefreshTokenRecord;
+      const token = tokenRecord as RefreshToken;
 
       // Check if revoked
       if (token.revokedAt) {
@@ -234,18 +209,95 @@ class AuthController {
       const response: AuthResponse = {
         accessToken,
         refreshTokenId,
-        user: {
-          id: userData.userId,
-          email: userData.email,
-          firstName: userData.firstName,
-          lastName: userData.lastName,
-        },
+        user: toPublicUser(userData),
       };
 
       res.json(response);
     } catch (error: any) {
       console.error('Refresh token error:', error);
       res.status(401).json({ error: error.message || 'Token refresh failed' });
+    }
+  }
+
+  async me(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = this.getAuthenticatedUserId(req);
+
+      if (!userId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
+      const user = await UserService.getUserById(userId);
+
+      if (!user) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      res.json({ user: toPublicUser(user) });
+    } catch (error: any) {
+      console.error('Get current user error:', error);
+      res.status(500).json({ error: error.message || 'Failed to fetch current user' });
+    }
+  }
+
+  async updateProfile(req: Request, res: Response): Promise<void> {
+    try {
+      const userId = this.getAuthenticatedUserId(req);
+
+      if (!userId) {
+        res.status(401).json({ error: 'Authentication required' });
+        return;
+      }
+
+      const { firstName, lastName, email } = req.body as UpdateProfileRequest;
+
+      if (!firstName && !lastName && !email) {
+        res.status(400).json({ error: 'At least one profile field is required' });
+        return;
+      }
+
+      const currentUser = await UserService.getUserById(userId);
+
+      if (!currentUser) {
+        res.status(404).json({ error: 'User not found' });
+        return;
+      }
+
+      const updates: Partial<typeof currentUser> = {};
+
+      if (email) {
+        const normalizedEmail = email.toLowerCase();
+        const existingUser = await UserService.getUserByEmail(normalizedEmail);
+
+        if (existingUser && existingUser.userId !== userId) {
+          res.status(409).json({ error: 'User with this email already exists' });
+          return;
+        }
+
+        updates.email = normalizedEmail;
+      }
+
+      if (firstName) {
+        updates.firstName = firstName;
+      }
+
+      if (lastName) {
+        updates.lastName = lastName;
+      }
+
+      const updatedUser = await UserService.updateUser(userId, updates);
+
+      if (!updatedUser) {
+        res.status(500).json({ error: 'Failed to update profile' });
+        return;
+      }
+
+      res.json({ user: toPublicUser(updatedUser) });
+    } catch (error: any) {
+      console.error('Update profile error:', error);
+      res.status(400).json({ error: error.message || 'Profile update failed' });
     }
   }
 }

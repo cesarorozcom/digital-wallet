@@ -177,67 +177,166 @@ heroku apps:info --app family-ledger-prod
 
 ## Heroku Deployment Configuration
 
-### Buildpack
+### Multi-App Deployment Strategy
+
+The project uses a **monorepo structure** with two separate Heroku apps:
+
+1. **Frontend App** (`family-ledger-frontend`): React web application
+   - Process: `web` (user-facing)
+   - Port: Listens on `$PORT` environment variable
+   - Build: `npm start` (or `serve -s build` for production)
+
+2. **Backend App** (`family-ledger-backend`): Node.js + Express REST API
+   - Process: `api` (API server)
+   - Port: Listens on `$PORT` environment variable
+   - Build: TypeScript compilation + Node.js runtime
+
+### Buildpack Configuration
+
+Each app uses the Node.js buildpack:
 
 ```bash
-# Setup buildpacks (Node.js + optional multi-buildpack)
-heroku buildpacks:set heroku/nodejs --app family-ledger-prod
+# Frontend
+heroku buildpacks:set heroku/nodejs --app family-ledger-frontend
+
+# Backend
+heroku buildpacks:set heroku/nodejs --app family-ledger-backend
 
 # Verify
-heroku buildpacks --app family-ledger-prod
-# == family-ledger-prod Buildpack URLs
+heroku buildpacks --app family-ledger-frontend
+heroku buildpacks --app family-ledger-backend
+# == Buildpack URLs
 # 1. heroku/nodejs
 ```
 
-### Procfile
+### Procfile (Monorepo Root)
+
+The root Procfile coordinates both apps:
 
 ```
-web: npm run build && node dist/server.js
+web: cd src/frontend && npm start
+api: cd src/backend && npm start
 ```
 
-**What Heroku Does**:
-1. Detects `package.json` (Node.js buildpack)
+**Deployment Flow**:
+
+**Frontend App**:
+1. Heroku detects `src/frontend/package.json`
 2. Installs dependencies: `npm ci --production`
-3. Runs build script: `npm run build` (compile React, TypeScript)
-4. Starts app: `node dist/server.js`
+3. Runs build script: `npm run build` (if defined)
+4. Starts process: `cd src/frontend && npm start` (from Procfile)
 
-### package.json Scripts
+**Backend App** (separate app):
+1. Heroku detects `src/backend/package.json`
+2. Installs dependencies: `npm ci --production`
+3. Runs build script: `npm run build` (TypeScript compilation)
+4. Starts process: `cd src/backend && npm start` (from Procfile)
+
+### Frontend package.json Scripts
 
 ```json
 {
+  "name": "family-ledger-frontend",
   "scripts": {
-    "dev": "concurrently 'npm:server:dev' 'npm:client:dev'",
-    "server:dev": "nodemon src/server.ts",
-    "client:dev": "react-scripts start",
-    "build": "npm run build:server && npm run build:client",
-    "build:server": "tsc src/server.ts --outDir dist --declaration",
-    "build:client": "react-scripts build",
-    "start": "node dist/server.js",
-    "test": "jest",
-    "test:integration": "jest --config jest.integration.js",
-    "test:e2e": "cypress run"
+    "dev": "react-scripts start",
+    "build": "react-scripts build",
+    "start": "serve -s build -l $PORT",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.16.0",
+    "axios": "^1.6.0",
+    "react-scripts": "5.0.1",
+    "serve": "^14.0.0"
   },
   "engines": {
-    "node": "18.19.0",
+    "node": "18.x",
     "npm": "9.x"
   }
 }
 ```
 
+**Key Points**:
+- `npm start` uses `serve` to serve the built React app (production-friendly)
+- Listens on `$PORT` (set by Heroku, defaults to 5000)
+- `build` script runs during `npm run build` (compile React)
+
+### Backend package.json Scripts
+
+```json
+{
+  "name": "family-ledger-backend",
+  "version": "1.0.0",
+  "main": "dist/server.js",
+  "scripts": {
+    "dev": "ts-node src/server.ts",
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "postinstall": "npm run build"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "cors": "^2.8.5",
+    "jsonwebtoken": "^9.0.0",
+    "bcrypt": "^5.1.0",
+    "uuid": "^9.0.0",
+    "aws-sdk": "^2.1400.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/cors": "^2.8.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "@types/bcrypt": "^5.0.0",
+    "@types/uuid": "^9.0.0",
+    "typescript": "^5.2.2",
+    "ts-node": "^10.9.0"
+  },
+  "engines": {
+    "node": "18.x",
+    "npm": "9.x"
+  }
+}
+```
+
+**Key Points**:
+- `npm run build` compiles TypeScript to `dist/`
+- `postinstall` hook automatically builds after `npm install`
+- `npm start` runs the compiled Node.js server
+- Listens on `$PORT` (set by Heroku)
+
 ### Environment Variables
 
-**Heroku Config Vars** (set via `heroku config:set`):
+**Frontend Heroku Config Vars** (set via `heroku config:set --app family-ledger-frontend`):
 
 ```bash
+# Node environment
+NODE_ENV=production
+PORT=5000                                  # Heroku assigns dynamically
+
+# API Configuration
+REACT_APP_API_BASE_URL=https://family-ledger-backend.herokuapp.com
+REACT_APP_API_TIMEOUT=10000
+```
+
+**Backend Heroku Config Vars** (set via `heroku config:set --app family-ledger-backend`):
+
+```bash
+# Node environment
+NODE_ENV=production
+PORT=5000                                  # Heroku assigns dynamically
+
 # Authentication
-JWT_SECRET=<generated-secret>               # 32+ byte random string
+JWT_SECRET=<generated-secret>              # 32+ byte random string
 JWT_ACCESS_EXPIRY=3600                     # 1 hour in seconds
 JWT_REFRESH_EXPIRY=604800                  # 7 days in seconds
 
 # AWS Configuration
 AWS_REGION=us-east-1
-AWS_ACCESS_KEY_ID=<IAM-user-key>          # Or use OIDC federation
-AWS_SECRET_ACCESS_KEY=<IAM-user-secret>   # Or use OIDC federation
+AWS_ACCESS_KEY_ID=<IAM-user-key>
+AWS_SECRET_ACCESS_KEY=<IAM-user-secret>
 
 # DynamoDB
 DYNAMODB_TABLE_USERS=Users
@@ -248,19 +347,81 @@ DYNAMODB_TABLE_REFRESH_TOKENS=RefreshTokens
 # S3
 S3_BUCKET=family-ledger-receipts-prod
 
-# Heroku
-NODE_ENV=production
-PORT=5000                                  # Heroku assigns this
+# Logging
+LOG_LEVEL=info
 ENVIRONMENT=production
-
-# Frontend
-REACT_APP_API_BASE_URL=https://api.family-ledger.com
-REACT_APP_AWS_REGION=us-east-1
 ```
 
-**How to Set**:
+**How to Set Variables**:
+
 ```bash
-heroku config:set JWT_SECRET="<secret>" --app family-ledger-prod
+# Frontend
+heroku config:set NODE_ENV=production REACT_APP_API_BASE_URL="https://family-ledger-backend.herokuapp.com" --app family-ledger-frontend
+
+# Backend
+heroku config:set \
+  NODE_ENV=production \
+  JWT_SECRET="<generated-secret>" \
+  AWS_REGION="us-east-1" \
+  AWS_ACCESS_KEY_ID="<key>" \
+  AWS_SECRET_ACCESS_KEY="<secret>" \
+  DYNAMODB_TABLE_USERS="Users" \
+  DYNAMODB_TABLE_CATEGORIES="Categories" \
+  DYNAMODB_TABLE_TRANSACTIONS="Transactions" \
+  DYNAMODB_TABLE_REFRESH_TOKENS="RefreshTokens" \
+  S3_BUCKET="family-ledger-receipts-prod" \
+  --app family-ledger-backend
+```
+
+### Deployment Architecture (Updated)
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│              FRONTEND (Heroku: family-ledger-frontend)          │
+├─────────────────────────────────────────────────────────────────┤
+│  Node.js 18 LTS + React + TailwindCSS                          │
+│  Buildpack: heroku/nodejs                                      │
+│  Process: web (npm start → serve -s build -l $PORT)            │
+│  Scale: 1-3 dynos (based on traffic)                           │
+│  Health Check: GET /health or index page                       │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │
+                       │ HTTPS + CORS (Origin: https://family-ledger-backend.herokuapp.com)
+                       │
+┌──────────────────────▼──────────────────────────────────────────┐
+│              BACKEND (Heroku: family-ledger-backend)            │
+├─────────────────────────────────────────────────────────────────┤
+│  Node.js 18 LTS + Express.js                                   │
+│  Buildpack: heroku/nodejs                                      │
+│  Process: api (npm start → node dist/server.js -l $PORT)       │
+│  Scale: 1-3 dynos (based on traffic)                           │
+│  Health Check: GET /health → { status: "ok" }                  │
+│  Logging: Heroku → CloudWatch (optional)                       │
+└──────────────────────┬──────────────────────────────────────────┘
+                       │
+        ┌──────────────┼──────────────┐
+        │              │              │
+    ┌──▼──┐      ┌─────▼──────┐  ┌───▼────────┐
+    │ JWT │      │ Categories │  │Transactions│
+    │Auth │      │  Endpoints │  │ Endpoints  │
+    └──┬──┘      └─────┬──────┘  └───┬────────┘
+       │              │              │
+┌──────▼──────────────▼──────────────▼──────────┐
+│        AWS SERVICES (External)                │
+├───────────────────────────────────────────────┤
+│  DynamoDB (On-demand):                       │
+│  - Users, Categories, Transactions           │
+│  - RefreshTokens (with TTL)                  │
+│                                              │
+│  S3 (Receipts storage):                      │
+│  - family-ledger-receipts-prod               │
+│  - Encryption: AES-256                       │
+│  - Lifecycle: Archive to Glacier @90d        │
+│                                              │
+│  CloudWatch Logs:                            │
+│  - /aws/lambda/* (7-day retention)          │
+│  - Monitoring & alarms                      │
+└──────────────────────────────────────────────┘
 ```
 
 ### Health Check
@@ -545,31 +706,332 @@ aws dynamodb restore-table-to-point-in-time \
 
 ---
 
+## Deployment Steps for Both Apps
+
+### Step 1: Create Heroku Apps
+
+```bash
+# Create frontend app
+heroku create family-ledger-frontend
+
+# Create backend app
+heroku create family-ledger-backend
+
+# Verify apps created
+heroku apps
+```
+
+### Step 2: Set Environment Variables
+
+**Backend (required before deployment)**:
+```bash
+heroku config:set \
+  NODE_ENV=production \
+  JWT_SECRET="$(openssl rand -base64 32)" \
+  AWS_REGION="us-east-1" \
+  AWS_ACCESS_KEY_ID="<your-aws-key>" \
+  AWS_SECRET_ACCESS_KEY="<your-aws-secret>" \
+  DYNAMODB_TABLE_USERS="Users" \
+  DYNAMODB_TABLE_CATEGORIES="Categories" \
+  DYNAMODB_TABLE_TRANSACTIONS="Transactions" \
+  DYNAMODB_TABLE_REFRESH_TOKENS="RefreshTokens" \
+  S3_BUCKET="family-ledger-receipts-prod" \
+  LOG_LEVEL="info" \
+  ENVIRONMENT="production" \
+  --app family-ledger-backend
+```
+
+**Frontend (required before deployment)**:
+```bash
+heroku config:set \
+  NODE_ENV=production \
+  REACT_APP_API_BASE_URL="https://family-ledger-backend.herokuapp.com" \
+  REACT_APP_API_TIMEOUT="10000" \
+  --app family-ledger-frontend
+```
+
+### Step 3: Deploy Both Apps
+
+**Deploy Frontend**:
+```bash
+# Set git remote for frontend
+heroku git:remote -a family-ledger-frontend -r frontend
+
+# Deploy (pushes src/frontend to Heroku)
+git subtree push --prefix src/frontend frontend main
+```
+
+**Deploy Backend**:
+```bash
+# Set git remote for backend
+heroku git:remote -a family-ledger-backend -r backend
+
+# Deploy (pushes src/backend to Heroku)
+git subtree push --prefix src/backend backend main
+```
+
+### Step 4: Verify Deployments
+
+```bash
+# Check frontend status
+heroku ps --app family-ledger-frontend
+# Output: one 'web' dyno running
+
+# Check backend status
+heroku ps --app family-ledger-backend
+# Output: one 'api' dyno running
+
+# View frontend logs
+heroku logs --tail --app family-ledger-frontend
+
+# View backend logs
+heroku logs --tail --app family-ledger-backend
+
+# Test frontend health
+curl https://family-ledger-frontend.herokuapp.com/
+
+# Test backend health
+curl https://family-ledger-backend.herokuapp.com/health
+```
+
+### Step 5: Enable CORS (Backend)
+
+The backend needs CORS configured to accept requests from the frontend:
+
+**Backend code (src/backend/src/server.ts)**:
+```typescript
+import express from 'express';
+import cors from 'cors';
+
+const app = express();
+
+// Configure CORS
+app.use(cors({
+  origin: process.env.NODE_ENV === 'production' 
+    ? 'https://family-ledger-frontend.herokuapp.com'
+    : 'http://localhost:3000',
+  credentials: true,
+  optionsSuccessStatus: 200
+}));
+
+// Routes
+app.get('/health', (req, res) => {
+  res.status(200).json({ status: 'ok', timestamp: new Date() });
+});
+```
+
+### Step 6: Database Setup
+
+Ensure AWS DynamoDB tables and S3 bucket are created (see Database Initialization section above).
+
+### Step 7: Monitor & Scale (if needed)
+
+```bash
+# View app info
+heroku apps:info --app family-ledger-frontend
+heroku apps:info --app family-ledger-backend
+
+# Scale to multiple dynos (optional)
+heroku ps:scale web=2 --app family-ledger-frontend
+heroku ps:scale api=2 --app family-ledger-backend
+
+# View metrics
+heroku metrics --app family-ledger-frontend
+heroku metrics --app family-ledger-backend
+```
+
+---
+
+## Alternative: Using Heroku Git vs Subtree
+
+### Option A: Subtree Push (Recommended for Monorepo)
+
+Deploy specific subdirectories without creating separate repos:
+
+```bash
+# Frontend
+heroku git:remote -a family-ledger-frontend -r frontend
+git subtree push --prefix src/frontend frontend main
+
+# Backend
+heroku git:remote -a family-ledger-backend -r backend
+git subtree push --prefix src/backend backend main
+```
+
+### Option B: Separate Git Repositories
+
+Create separate repos for each app (more complex but standard practice):
+
+```bash
+# In a separate directory for frontend
+git clone git@github.com:user/digital-wallet.git frontend-app
+cd frontend-app
+git filter-branch --subdirectory-filter src/frontend -- main
+heroku git:remote -a family-ledger-frontend
+git push heroku main
+
+# Same for backend
+```
+
+### Option C: Using GitHub Actions for CI/CD
+
+Automate deployments via Git push:
+
+**File**: `.github/workflows/deploy-heroku.yml`
+
+```yaml
+name: Deploy to Heroku
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'src/frontend/**'
+      - 'src/backend/**'
+
+jobs:
+  deploy-frontend:
+    if: contains(github.event.head_commit.modified, 'src/frontend/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: akhileshns/heroku-deploy@v3.12.12
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: family-ledger-frontend
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          appdir: src/frontend
+
+  deploy-backend:
+    if: contains(github.event.head_commit.modified, 'src/backend/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+      - uses: akhileshns/heroku-deploy@v3.12.12
+        with:
+          heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+          heroku_app_name: family-ledger-backend
+          heroku_email: ${{ secrets.HEROKU_EMAIL }}
+          appdir: src/backend
+```
+
+---
+
+## Troubleshooting
+
+### Build Failures
+
+**TypeScript Compilation Errors**:
+- Ensure all `@types/*` packages are in `devDependencies`
+- Check `tsconfig.json` for correct settings
+- Verify Node version matches `engines` in `package.json`
+
+```bash
+# Check Node version on Heroku
+heroku run node --version --app family-ledger-backend
+```
+
+**Missing Dependencies**:
+```bash
+# Verify all dependencies are listed
+npm ls --all --app family-ledger-backend
+
+# Reinstall locally to test
+rm -rf node_modules package-lock.json
+npm ci
+```
+
+### Runtime Failures
+
+**Port Not Listening**:
+- Ensure app listens on `$PORT` environment variable
+- Heroku assigns a random port; app must be flexible
+
+```typescript
+const port = process.env.PORT || 5000;
+app.listen(port, () => console.log(`Listening on ${port}`));
+```
+
+**Module Not Found**:
+- Check imports match file structure
+- Verify `package.json` paths are correct
+- Run `npm ls` to check installed packages
+
+```bash
+heroku logs --tail --app family-ledger-backend | grep -i "cannot find"
+```
+
+### CORS Issues
+
+**Frontend Can't Reach Backend**:
+- Verify backend `CORS` configuration
+- Check frontend `REACT_APP_API_BASE_URL` env var
+- Test with `curl`:
+
+```bash
+curl -H "Origin: https://family-ledger-frontend.herokuapp.com" \
+     -H "Access-Control-Request-Method: GET" \
+     https://family-ledger-backend.herokuapp.com/health
+```
+
+---
+
+## Rollback Procedures
+
+### Heroku Releases
+
+```bash
+# View release history
+heroku releases --app family-ledger-frontend
+heroku releases --app family-ledger-backend
+
+# Rollback to previous version
+heroku rollback --app family-ledger-frontend
+heroku rollback --app family-ledger-backend
+
+# Check status
+heroku logs --tail --app family-ledger-frontend
+```
+
+### Database Rollback (AWS)
+
+```bash
+# For DynamoDB point-in-time recovery
+aws dynamodb describe-continuous-backups \
+  --table-name Transactions \
+  --region us-east-1
+
+aws dynamodb restore-table-to-point-in-time \
+  --source-table-name Transactions \
+  --target-table-name Transactions-Restored \
+  --use-latest-restorable-time \
+  --region us-east-1
+```
+
+---
+
 ## Deployment Checklist
 
-### Pre-Deployment
-- [ ] All tests pass (unit, integration, e2e)
-- [ ] Code reviewed and approved
-- [ ] Security scan completed (no vulnerabilities)
-- [ ] Database migrations tested in staging
-- [ ] Environment variables set correctly
-- [ ] Rollback plan documented
-
-### Deployment
-- [ ] Deploy to staging first
-- [ ] Run smoke tests in staging
-- [ ] Get sign-off from product lead
-- [ ] Deploy to production
-- [ ] Monitor CloudWatch metrics (5 minutes)
-- [ ] Test critical user flows
-- [ ] Verify database consistency
-
-### Post-Deployment
-- [ ] Monitor error rates (24 hours)
-- [ ] Check CloudWatch logs for anomalies
-- [ ] Verify user transactions are processing
-- [ ] Update deployment notes/runbook
-- [ ] Communicate rollout to team
+- [ ] Backend environment variables set
+- [ ] Frontend environment variables set  
+- [ ] TypeScript compiles locally (`npm run build`)
+- [ ] All tests pass locally
+- [ ] Security audit completed
+- [ ] DynamoDB tables created
+- [ ] S3 bucket created and configured
+- [ ] CORS headers configured in backend
+- [ ] Procfile updated for both apps
+- [ ] Frontend deployed successfully
+- [ ] Backend deployed successfully
+- [ ] Health checks pass
+- [ ] Frontend can connect to backend
+- [ ] User can log in and create transactions
+- [ ] Logs are being collected
+- [ ] Monitoring alerts are configured
 
 ---
 

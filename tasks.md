@@ -38,13 +38,13 @@
 - [ ] T013 [P] Create CORS middleware in src/backend/src/middleware/cors.ts
 - [ ] T014 [P] Create request logging middleware in src/backend/src/middleware/logging.ts
 - [ ] T015 [P] Create DynamoDB client configuration in src/backend/src/config/dynamodb.ts
-- [ ] T016 [P] Create S3 client configuration in src/backend/src/config/s3.ts
-- [ ] T017 Create base response formatter utility in src/backend/src/utils/response.ts
+- [x] T016 [P] Create S3 client configuration in src/backend/src/config/s3.ts
+- [x] T017 Create base response formatter utility in src/backend/src/utils/response.ts
 - [ ] T018 Create environment validation in src/backend/src/config/env.ts
-- [ ] T019 [P] Setup React app with routing (React Router) in src/frontend/src/App.tsx
-- [ ] T020 [P] Create API client service (axios) in src/frontend/src/services/api.ts
-- [ ] T021 [P] Setup Context API for global state management in src/frontend/src/context/AppContext.tsx
-- [ ] T022 [P] Create base layout component with navigation in src/frontend/src/components/Layout.tsx
+- [x] T019 [P] Setup React app with routing (React Router) in src/frontend/src/App.tsx
+- [x] T020 [P] Create API client service (axios) in src/frontend/src/services/api.ts
+- [x] T021 [P] Setup Context API for global state management in src/frontend/src/context/AppContext.tsx
+- [x] T022 [P] Create base layout component with navigation in src/frontend/src/components/Layout.tsx
 
 **Checkpoint**: Foundation ready - all user story implementation can begin in parallel
 
@@ -58,24 +58,24 @@
 
 ### Implementation for US1
 
-- [ ] T023 [P] [US1] Create User entity model in src/backend/src/models/User.ts
-- [ ] T024 [P] [US1] Create User service (CRUD operations) in src/backend/src/services/UserService.ts
-- [ ] T025 [P] [US1] Create RefreshToken entity model in src/backend/src/models/RefreshToken.ts
-- [ ] T026 [P] [US1] Create authentication middleware in src/backend/src/middleware/auth.ts
-- [ ] T027 [US1] Implement POST /api/auth/register endpoint in src/backend/src/routes/authRoutes.ts
-- [ ] T028 [US1] Implement POST /api/auth/login endpoint in src/backend/src/routes/authRoutes.ts
-- [ ] T029 [US1] Implement POST /api/auth/refresh endpoint in src/backend/src/routes/authRoutes.ts
-- [ ] T030 [US1] Implement POST /api/auth/logout endpoint in src/backend/src/routes/authRoutes.ts
-- [ ] T031 [US1] Implement GET /api/auth/me (current user profile) endpoint in src/backend/src/routes/authRoutes.ts
-- [ ] T032 [US1] Implement PUT /api/auth/profile (update user profile) endpoint in src/backend/src/routes/authRoutes.ts
-- [ ] T033 [P] [US1] Create login form component in src/frontend/src/pages/LoginPage.tsx
-- [ ] T034 [P] [US1] Create registration form component in src/frontend/src/pages/RegisterPage.tsx
-- [ ] T035 [P] [US1] Create user profile page component in src/frontend/src/pages/ProfilePage.tsx
-- [ ] T036 [US1] Implement token storage and retrieval in localStorage in src/frontend/src/utils/tokenStorage.ts
-- [ ] T037 [US1] Implement authentication context provider in src/frontend/src/context/AuthContext.tsx
-- [ ] T038 [US1] Implement protected route component in src/frontend/src/components/ProtectedRoute.tsx
-- [ ] T039 [US1] Add input validation and error handling to auth forms in src/frontend/src/components/
-- [ ] T040 [US1] Add logout functionality to navigation in src/frontend/src/components/Layout.tsx
+- [x] T023 [P] [US1] Create User entity model in src/backend/src/models/User.ts
+- [x] T024 [P] [US1] Create User service (CRUD operations) in src/backend/src/services/UserService.ts
+- [x] T025 [P] [US1] Create RefreshToken entity model in src/backend/src/models/RefreshToken.ts
+- [x] T026 [P] [US1] Create authentication middleware in src/backend/src/middleware/auth.ts
+- [x] T027 [US1] Implement POST /api/auth/register endpoint in src/backend/src/routes/authRoutes.ts
+- [x] T028 [US1] Implement POST /api/auth/login endpoint in src/backend/src/routes/authRoutes.ts
+- [x] T029 [US1] Implement POST /api/auth/refresh endpoint in src/backend/src/routes/authRoutes.ts
+- [x] T030 [US1] Implement POST /api/auth/logout endpoint in src/backend/src/routes/authRoutes.ts
+- [x] T031 [US1] Implement GET /api/auth/me (current user profile) endpoint in src/backend/src/routes/authRoutes.ts
+- [x] T032 [US1] Implement PUT /api/auth/profile (update user profile) endpoint in src/backend/src/routes/authRoutes.ts
+- [x] T033 [P] [US1] Create login form component in src/frontend/src/pages/LoginPage.tsx
+- [x] T034 [P] [US1] Create registration form component in src/frontend/src/pages/RegisterPage.tsx
+- [x] T035 [P] [US1] Create user profile page component in src/frontend/src/pages/ProfilePage.tsx
+- [x] T036 [US1] Implement token storage and retrieval in localStorage in src/frontend/src/utils/tokenStorage.ts
+- [x] T037 [US1] Implement authentication context provider in src/frontend/src/context/AuthContext.tsx
+- [x] T038 [US1] Implement protected route component in src/frontend/src/components/ProtectedRoute.tsx
+- [x] T039 [US1] Add input validation and error handling to auth forms in src/frontend/src/components/
+- [x] T040 [US1] Add logout functionality to navigation in src/frontend/src/components/Layout.tsx
 
 **Checkpoint**: User Story 1 complete - users can register, login, and manage accounts
 
@@ -89,19 +89,19 @@
 
 ### Implementation for US2
 
-- [ ] T041 [P] [US2] Create Category entity model in src/backend/src/models/Category.ts
-- [ ] T042 [P] [US2] Create Category service (CRUD operations) in src/backend/src/services/CategoryService.ts
-- [ ] T043 [US2] Implement POST /api/categories endpoint in src/backend/src/routes/categoryRoutes.ts
-- [ ] T044 [US2] Implement GET /api/categories endpoint in src/backend/src/routes/categoryRoutes.ts
-- [ ] T045 [US2] Implement PUT /api/categories/:categoryId endpoint in src/backend/src/routes/categoryRoutes.ts
-- [ ] T046 [US2] Implement DELETE /api/categories/:categoryId endpoint in src/backend/src/routes/categoryRoutes.ts
-- [ ] T047 [US2] Add validation to prevent duplicate category names in src/backend/src/services/CategoryService.ts
-- [ ] T048 [P] [US2] Create categories list page component in src/frontend/src/pages/CategoriesPage.tsx
-- [ ] T049 [P] [US2] Create category form modal component in src/frontend/src/components/CategoryForm.tsx
-- [ ] T050 [US2] Implement category CRUD UI in src/frontend/src/pages/CategoriesPage.tsx
-- [ ] T051 [US2] Add category management context in src/frontend/src/context/CategoryContext.tsx
-- [ ] T052 [US2] Add color and icon picker to category form in src/frontend/src/components/CategoryForm.tsx
-- [ ] T053 [US2] Implement optimistic UI updates for category operations in src/frontend/
+- [x] T041 [P] [US2] Create Category entity model in src/backend/src/models/Category.ts
+- [x] T042 [P] [US2] Create Category service (CRUD operations) in src/backend/src/services/CategoryService.ts
+- [x] T043 [US2] Implement POST /api/categories endpoint in src/backend/src/routes/categoryRoutes.ts
+- [x] T044 [US2] Implement GET /api/categories endpoint in src/backend/src/routes/categoryRoutes.ts
+- [x] T045 [US2] Implement PUT /api/categories/:categoryId endpoint in src/backend/src/routes/categoryRoutes.ts
+- [x] T046 [US2] Implement DELETE /api/categories/:categoryId endpoint in src/backend/src/routes/categoryRoutes.ts
+- [x] T047 [US2] Add validation to prevent duplicate category names in src/backend/src/services/CategoryService.ts
+- [x] T048 [P] [US2] Create categories list page component in src/frontend/src/pages/CategoriesPage.tsx
+- [x] T049 [P] [US2] Create category form modal component in src/frontend/src/components/CategoryForm.tsx
+- [x] T050 [US2] Implement category CRUD UI in src/frontend/src/pages/CategoriesPage.tsx
+- [x] T051 [US2] Add category management context in src/frontend/src/context/CategoryContext.tsx
+- [x] T052 [US2] Add color and icon picker to category form in src/frontend/src/components/CategoryForm.tsx
+- [x] T053 [US2] Implement optimistic UI updates for category operations in src/frontend/
 
 **Checkpoint**: User Story 2 complete - users can manage personal categories
 
@@ -115,24 +115,24 @@
 
 ### Implementation for US3
 
-- [ ] T054 [P] [US3] Create Transaction entity model in src/backend/src/models/Transaction.ts
-- [ ] T055 [P] [US3] Create Transaction service (CRUD + business logic) in src/backend/src/services/TransactionService.ts
-- [ ] T056 [US3] Implement POST /api/transactions endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T057 [US3] Implement GET /api/transactions endpoint with filtering in src/backend/src/routes/transactionRoutes.ts
-- [ ] T058 [US3] Implement GET /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T059 [US3] Implement PUT /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T060 [US3] Implement DELETE /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T061 [US3] Add transaction type validation (DEPOSIT/PAYMENT only) in src/backend/src/services/TransactionService.ts
-- [ ] T062 [US3] Add transaction date validation (month scoping) in src/backend/src/services/TransactionService.ts
-- [ ] T063 [P] [US3] Create transactions dashboard page in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T064 [P] [US3] Create transaction form component in src/frontend/src/components/TransactionForm.tsx
-- [ ] T065 [P] [US3] Create transaction list component in src/frontend/src/components/TransactionList.tsx
-- [ ] T066 [US3] Implement transaction filtering by date range in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T067 [US3] Implement transaction filtering by category in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T068 [US3] Add transaction CRUD UI in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T069 [US3] Add transaction context in src/frontend/src/context/TransactionContext.tsx
-- [ ] T070 [US3] Implement amount formatting and validation in src/frontend/src/components/TransactionForm.tsx
-- [ ] T071 [US3] Add transaction type selection (DEPOSIT/PAYMENT) in src/frontend/src/components/TransactionForm.tsx
+- [x] T054 [P] [US3] Create Transaction entity model in src/backend/src/models/Transaction.ts
+- [x] T055 [P] [US3] Create Transaction service (CRUD + business logic) in src/backend/src/services/TransactionService.ts
+- [x] T056 [US3] Implement POST /api/transactions endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T057 [US3] Implement GET /api/transactions endpoint with filtering in src/backend/src/routes/transactionRoutes.ts
+- [x] T058 [US3] Implement GET /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T059 [US3] Implement PUT /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T060 [US3] Implement DELETE /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T061 [US3] Add transaction type validation (DEPOSIT/PAYMENT only) in src/backend/src/services/TransactionService.ts
+- [x] T062 [US3] Add transaction date validation (month scoping) in src/backend/src/services/TransactionService.ts
+- [x] T063 [P] [US3] Create transactions dashboard page in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T064 [P] [US3] Create transaction form component in src/frontend/src/components/TransactionForm.tsx
+- [x] T065 [P] [US3] Create transaction list component in src/frontend/src/components/TransactionList.tsx
+- [x] T066 [US3] Implement transaction filtering by date range in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T067 [US3] Implement transaction filtering by category in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T068 [US3] Add transaction CRUD UI in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T069 [US3] Add transaction context in src/frontend/src/context/TransactionContext.tsx
+- [x] T070 [US3] Implement amount formatting and validation in src/frontend/src/components/TransactionForm.tsx
+- [x] T071 [US3] Add transaction type selection (DEPOSIT/PAYMENT) in src/frontend/src/components/TransactionForm.tsx
 
 **Checkpoint**: User Story 3 complete - users can manage transactions
 
@@ -930,4 +930,3 @@ T1.1 (AWS Setup)
  All critical paths have test coverage (>80%)
  API documented with Swagger
  Deployed to production with monitoring
-
