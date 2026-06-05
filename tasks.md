@@ -115,24 +115,24 @@
 
 ### Implementation for US3
 
-- [ ] T054 [P] [US3] Create Transaction entity model in src/backend/src/models/Transaction.ts
-- [ ] T055 [P] [US3] Create Transaction service (CRUD + business logic) in src/backend/src/services/TransactionService.ts
-- [ ] T056 [US3] Implement POST /api/transactions endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T057 [US3] Implement GET /api/transactions endpoint with filtering in src/backend/src/routes/transactionRoutes.ts
-- [ ] T058 [US3] Implement GET /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T059 [US3] Implement PUT /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T060 [US3] Implement DELETE /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
-- [ ] T061 [US3] Add transaction type validation (DEPOSIT/PAYMENT only) in src/backend/src/services/TransactionService.ts
-- [ ] T062 [US3] Add transaction date validation (month scoping) in src/backend/src/services/TransactionService.ts
-- [ ] T063 [P] [US3] Create transactions dashboard page in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T064 [P] [US3] Create transaction form component in src/frontend/src/components/TransactionForm.tsx
-- [ ] T065 [P] [US3] Create transaction list component in src/frontend/src/components/TransactionList.tsx
-- [ ] T066 [US3] Implement transaction filtering by date range in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T067 [US3] Implement transaction filtering by category in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T068 [US3] Add transaction CRUD UI in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T069 [US3] Add transaction context in src/frontend/src/context/TransactionContext.tsx
-- [ ] T070 [US3] Implement amount formatting and validation in src/frontend/src/components/TransactionForm.tsx
-- [ ] T071 [US3] Add transaction type selection (DEPOSIT/PAYMENT) in src/frontend/src/components/TransactionForm.tsx
+- [x] T054 [P] [US3] Create Transaction entity model in src/backend/src/models/Transaction.ts
+- [x] T055 [P] [US3] Create Transaction service (CRUD + business logic) in src/backend/src/services/TransactionService.ts
+- [x] T056 [US3] Implement POST /api/transactions endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T057 [US3] Implement GET /api/transactions endpoint with filtering in src/backend/src/routes/transactionRoutes.ts
+- [x] T058 [US3] Implement GET /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T059 [US3] Implement PUT /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T060 [US3] Implement DELETE /api/transactions/:transactionId endpoint in src/backend/src/routes/transactionRoutes.ts
+- [x] T061 [US3] Add transaction type validation (DEPOSIT/PAYMENT only) in src/backend/src/services/TransactionService.ts
+- [x] T062 [US3] Add transaction date validation (month scoping) in src/backend/src/services/TransactionService.ts
+- [x] T063 [P] [US3] Create transactions dashboard page in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T064 [P] [US3] Create transaction form component in src/frontend/src/components/TransactionForm.tsx
+- [x] T065 [P] [US3] Create transaction list component in src/frontend/src/components/TransactionList.tsx
+- [x] T066 [US3] Implement transaction filtering by date range in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T067 [US3] Implement transaction filtering by category in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T068 [US3] Add transaction CRUD UI in src/frontend/src/pages/TransactionsPage.tsx
+- [x] T069 [US3] Add transaction context in src/frontend/src/context/TransactionContext.tsx
+- [x] T070 [US3] Implement amount formatting and validation in src/frontend/src/components/TransactionForm.tsx
+- [x] T071 [US3] Add transaction type selection (DEPOSIT/PAYMENT) in src/frontend/src/components/TransactionForm.tsx
 
 **Checkpoint**: User Story 3 complete - users can manage transactions
 

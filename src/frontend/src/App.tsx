@@ -8,6 +8,7 @@ import RegisterPage from './pages/RegisterPage';
 import DashboardPage from './pages/DashboardPage';
 import ProfilePage from './pages/ProfilePage';
 import CategoriesPage from './pages/CategoriesPage';
+import { TransactionsPage } from './pages/TransactionsPage';
 
 const APP_ROUTES = {
   home: '/',
@@ -16,6 +17,7 @@ const APP_ROUTES = {
   dashboard: '/dashboard',
   profile: '/profile',
   categories: '/categories',
+  transactions: '/transactions',
 } as const;
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
@@ -81,6 +83,16 @@ function App() {
           }
         >
           <Route index element={<CategoriesPage />} />
+        </Route>
+        <Route
+          path={APP_ROUTES.transactions}
+          element={
+            <ProtectedRoute redirectTo={APP_ROUTES.login}>
+              <Layout />
+            </ProtectedRoute>
+          }
+        >
+          <Route index element={<TransactionsPage />} />
         </Route>
         <Route path={APP_ROUTES.home} element={<Navigate to={APP_ROUTES.dashboard} replace />} />
         <Route path="*" element={<Navigate to={APP_ROUTES.home} replace />} />

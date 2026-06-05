@@ -88,6 +88,46 @@ export interface UpdateCategoryPayload {
   icon?: string;
 }
 
+export interface ExtractedData {
+  confidence: number;
+  rawText: string;
+  reviewNotes?: string;
+}
+
+export interface Transaction {
+  transactionId: string;
+  userId: string;
+  categoryId: string;
+  amount: number;
+  type: 'DEPOSIT' | 'PAYMENT';
+  merchantName: string;
+  receiptImageUrl: string;
+  status: 'PENDING' | 'PENDING_REVIEW' | 'CONFIRMED';
+  transactionDate: string;
+  transactionMonth: string;
+  notes?: string;
+  extractedData?: ExtractedData;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TransactionPayload {
+  categoryId: string;
+  amount: number;
+  merchantName: string;
+  receiptImageUrl?: string;
+  transactionDate: string;
+  notes?: string;
+}
+
+export interface UpdateTransactionPayload {
+  categoryId?: string;
+  merchantName?: string;
+  notes?: string;
+  status?: 'PENDING' | 'PENDING_REVIEW' | 'CONFIRMED';
+  extractedData?: Partial<ExtractedData>;
+}
+
 interface RetryableRequestConfig {
   _retry?: boolean;
 }
@@ -257,6 +297,72 @@ export const categoryService = {
       await apiClient.delete(`/categories/${categoryId}`);
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Failed to delete category'));
+    }
+  },
+};
+
+export const transactionService = {
+  async list(month?: string, categoryId?: string): Promise<Transaction[]> {
+    try {
+      const params = new URLSearchParams();
+      if (month) {
+        params.append('month', month);
+      }
+      if (categoryId) {
+        params.append('categoryId', categoryId);
+      }
+      const response = await apiClient.get<{ transactions: Transaction[] }>(
+        `/transactions${params.toString() ? `?${params.toString()}` : ''}`,
+      );
+      return response.data.transactions;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Failed to fetch transactions'));
+    }
+  },
+
+  async get(transactionId: string): Promise<Transaction> {
+    try {
+      const response = await apiClient.get<{ transaction: Transaction }>(
+        `/transactions/${transactionId}`,
+      );
+      return response.data.transaction;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Failed to fetch transaction'));
+    }
+  },
+
+  async create(payload: TransactionPayload): Promise<Transaction> {
+    try {
+      const response = await apiClient.post<{ transaction: Transaction }>(
+        '/transactions',
+        payload,
+      );
+      return response.data.transaction;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Failed to create transaction'));
+    }
+  },
+
+  async update(
+    transactionId: string,
+    payload: UpdateTransactionPayload,
+  ): Promise<Transaction> {
+    try {
+      const response = await apiClient.put<{ transaction: Transaction }>(
+        `/transactions/${transactionId}`,
+        payload,
+      );
+      return response.data.transaction;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Failed to update transaction'));
+    }
+  },
+
+  async remove(transactionId: string): Promise<void> {
+    try {
+      await apiClient.delete(`/transactions/${transactionId}`);
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Failed to delete transaction'));
     }
   },
 };

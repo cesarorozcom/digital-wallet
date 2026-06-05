@@ -4,6 +4,7 @@ import { useAuthContext } from '../context/AuthContext';
 
 const NAV_ITEMS = [
   { label: 'Dashboard', path: '/dashboard' },
+  { label: 'Transacciones', path: '/transactions' },
   { label: 'Categorías', path: '/categories' },
   { label: 'Perfil', path: '/profile' },
 ] as const;
