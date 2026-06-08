@@ -112,6 +112,7 @@ export interface Transaction {
 }
 
 export interface TransactionPayload {
+  transactionId?: string;
   categoryId: string;
   amount: number;
   merchantName: string;
@@ -122,7 +123,9 @@ export interface TransactionPayload {
 
 export interface UpdateTransactionPayload {
   categoryId?: string;
+  amount?: number;
   merchantName?: string;
+  transactionDate?: string;
   notes?: string;
   status?: 'PENDING' | 'PENDING_REVIEW' | 'CONFIRMED';
   extractedData?: Partial<ExtractedData>;
@@ -363,6 +366,40 @@ export const transactionService = {
       await apiClient.delete(`/transactions/${transactionId}`);
     } catch (error) {
       throw new Error(getErrorMessage(error, 'Failed to delete transaction'));
+    }
+  },
+};
+
+export const uploadService = {
+  async getPresignUrl(
+    filename: string,
+    contentType: string,
+    transactionId: string,
+  ): Promise<{ url: string; key: string }> {
+    try {
+      const response = await apiClient.post<{ url: string; key: string }>(
+        '/uploads/presign',
+        { filename, contentType, transactionId },
+      );
+      return response.data;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Failed to get presigned URL'));
+    }
+  },
+
+  async uploadToS3(
+    presignedUrl: string,
+    blob: Blob,
+    contentType: string,
+  ): Promise<void> {
+    const response = await fetch(presignedUrl, {
+      method: 'PUT',
+      body: blob,
+      headers: { 'Content-Type': contentType },
+      // Deliberately no Authorization header — S3 presigned URLs are self-authorized
+    });
+    if (!response.ok) {
+      throw new Error(`S3 upload failed: ${response.status} ${response.statusText}`);
     }
   },
 };

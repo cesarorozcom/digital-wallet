@@ -94,7 +94,7 @@ class TransactionService {
     const month = this.getTransactionMonth(payload.transactionDate);
 
     const transaction: Transaction = {
-      transactionId: uuidv4(),
+      transactionId: payload.transactionId || uuidv4(),
       userId,
       categoryId: payload.categoryId.trim(),
       amount,
@@ -157,6 +157,19 @@ class TransactionService {
         throw new Error('Invalid transaction status');
       }
       updates.status = payload.status;
+    }
+
+    if (payload.amount !== undefined) {
+      if (!Number.isFinite(payload.amount) || payload.amount === 0) {
+        throw new Error('Transaction amount must be a non-zero finite number');
+      }
+      updates.amount = Math.round(payload.amount * 100) / 100;
+      updates.type = this.getTransactionType(updates.amount);
+    }
+
+    if (payload.transactionDate !== undefined) {
+      updates.transactionDate = payload.transactionDate;
+      updates.transactionMonth = this.getTransactionMonth(payload.transactionDate);
     }
 
     if (payload.extractedData !== undefined) {

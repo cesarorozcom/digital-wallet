@@ -69,6 +69,11 @@ export class PasswordService {
       throw new Error('Password hash must be a non-empty string');
     }
 
+    // bcrypt hashes always start with $2b$, $2a$, or $2y$ followed by the cost factor
+    if (!passwordHash.startsWith('$2')) {
+      throw new Error('Password comparison failed: invalid hash format');
+    }
+
     try {
       const isMatch = await bcrypt.compare(plainPassword, passwordHash);
       return isMatch;

@@ -25,6 +25,7 @@ export interface Transaction {
 }
 
 export interface TransactionPayload {
+  transactionId?: string;   // optional — if provided, used as-is (e.g. receipt upload flow)
   categoryId: string;
   amount: number;
   merchantName: string;
@@ -35,7 +36,9 @@ export interface TransactionPayload {
 
 export interface TransactionUpdatePayload {
   categoryId?: string;
+  amount?: number;
   merchantName?: string;
+  transactionDate?: string;
   notes?: string;
   status?: TransactionStatus;
   extractedData?: Partial<ExtractedData>;

@@ -4,6 +4,8 @@ import 'dotenv/config';
 import authRoutes from './routes/authRoutes';
 import categoryRoutes from './routes/categoryRoutes';
 import transactionRoutes from './routes/transactionRoutes';
+import receiptRoutes from './routes/receiptRoutes';
+import uploadRoutes from './routes/uploadRoutes';
 
 const app: Express = express();
 const port = process.env.PORT || 3000;
@@ -51,6 +53,8 @@ app.get('/', (req: Request, res: Response) => {
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/transactions', transactionRoutes);
+app.use('/api/receipts', receiptRoutes);
+app.use('/api/uploads', uploadRoutes);
 
 // Routes list
 app.get('/api/routes', (req: Request, res: Response) => {
@@ -72,6 +76,8 @@ app.get('/api/routes', (req: Request, res: Response) => {
       'GET /api/transactions/:transactionId',
       'PUT /api/transactions/:transactionId',
       'DELETE /api/transactions/:transactionId',
+      'PUT /api/receipts/:receiptId/confirm',
+      'POST /api/uploads',
     ],
   });
 });

@@ -43,9 +43,18 @@ class DynamoDBService {
 
   async update(tableName: string, key: Record<string, any>, updates: Record<string, any>) {
     try {
+      // Alias every attribute name with # to avoid DynamoDB reserved keyword conflicts
       const updateExpression = Object.keys(updates)
-        .map((attr) => `${attr} = :${attr}`)
+        .map((attr) => `#${attr} = :${attr}`)
         .join(', ');
+
+      const expressionAttributeNames = Object.keys(updates).reduce(
+        (acc, attr) => {
+          acc[`#${attr}`] = attr;
+          return acc;
+        },
+        {} as Record<string, string>
+      );
 
       const expressionAttributeValues = Object.entries(updates).reduce(
         (acc, [k, value]) => {
@@ -59,6 +68,7 @@ class DynamoDBService {
         TableName: tableName,
         Key: key,
         UpdateExpression: `SET ${updateExpression}`,
+        ExpressionAttributeNames: expressionAttributeNames,
         ExpressionAttributeValues: expressionAttributeValues,
         ReturnValues: 'ALL_NEW',
       });

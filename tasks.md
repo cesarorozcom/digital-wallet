@@ -146,8 +146,8 @@
 
 ### Implementation for US4
 
-- [ ] T072 [P] [US4] Create S3 upload service with presigned URLs in src/backend/src/services/S3Service.ts
-- [ ] T073 [P] [US4] Create Lambda function for receipt processing in src/backend/lambda/receiptProcessor.ts
+- [x] T072 [P] [US4] Create S3 upload service with presigned URLs in src/backend/src/services/S3Service.ts
+- [x] T073 [P] [US4] Create Lambda function for receipt processing in src/backend/lambda/receiptProcessor.ts
 - [ ] T074 [P] [US4] Create Comprehend integration service in src/backend/src/services/ComprehendService.ts
 - [ ] T075 [US4] Implement POST /api/receipts/upload endpoint (presigned URL generation) in src/backend/src/routes/receiptRoutes.ts
 - [ ] T076 [US4] Implement S3 → Lambda → DynamoDB event trigger configuration in AWS
@@ -155,15 +155,15 @@
 - [ ] T078 [US4] Implement confidence threshold check (≥90%) in src/backend/lambda/receiptProcessor.ts
 - [ ] T079 [US4] Implement PENDING_REVIEW status for low-confidence results in src/backend/lambda/receiptProcessor.ts
 - [ ] T080 [US4] Implement error handling and retry logic in src/backend/lambda/receiptProcessor.ts
-- [ ] T081 [US4] Implement PUT /api/receipts/:receiptId/confirm endpoint for user review in src/backend/src/routes/receiptRoutes.ts
-- [ ] T082 [P] [US4] Create receipt upload component with camera input in src/frontend/src/components/ReceiptUpload.tsx
-- [ ] T083 [P] [US4] Create image compression service (60-70% JPEG quality) in src/frontend/src/services/imageCompressionService.ts
-- [ ] T084 [US4] Implement image selection and compression in src/frontend/src/components/ReceiptUpload.tsx
-- [ ] T085 [US4] Implement receipt upload to S3 using presigned URLs in src/frontend/src/services/api.ts
-- [ ] T086 [US4] Implement upload progress feedback in src/frontend/src/components/ReceiptUpload.tsx
+- [X] T081 [US4] Implement PUT /api/receipts/:receiptId/confirm endpoint for user review in src/backend/src/routes/receiptRoutes.ts
+- [X] T082 [P] [US4] Create receipt upload component with camera input in src/frontend/src/components/ReceiptUpload.tsx
+- [X] T083 [P] [US4] Create image compression service (60-70% JPEG quality) in src/frontend/src/services/imageCompressionService.ts
+- [X] T084 [US4] Implement image selection and compression in src/frontend/src/components/ReceiptUpload.tsx
+- [X] T085 [US4] Implement receipt upload to S3 using presigned URLs in src/frontend/src/services/api.ts
+- [X] T086 [US4] Implement upload progress feedback in src/frontend/src/components/ReceiptUpload.tsx
 - [ ] T087 [US4] Create receipt review modal for pending transactions in src/frontend/src/components/ReceiptReview.tsx
-- [ ] T088 [US4] Implement manual transaction creation fallback in src/frontend/src/pages/TransactionsPage.tsx
-- [ ] T089 [US4] Add receipt images to transaction display in src/frontend/src/components/TransactionList.tsx
+- [X] T088 [US4] Implement manual transaction creation fallback in src/frontend/src/pages/TransactionsPage.tsx
+- [X] T089 [US4] Add receipt images to transaction display in src/frontend/src/components/TransactionList.tsx
 
 **Checkpoint**: User Story 4 complete - users can upload receipts and extract transaction details automatically
 

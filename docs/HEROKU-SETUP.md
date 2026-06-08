@@ -1,10 +1,10 @@
 # Heroku Deployment Guide
 
-This guide explains how to deploy the Billetera Digital application to Heroku.
+This guide explains how to deploy the Billetera Digital application to Heroku. It reflects the actual setup and commands used in this project — not just generic Heroku documentation.
 
 ## Prerequisites
 
-- Heroku account and CLI installed
+- Heroku account and CLI installed (`brew tap heroku/brew && brew install heroku`)
 - Git repository initialized locally (already done)
 - Backend and frontend code complete and tested locally
 - AWS resources configured (see `docs/AWS-SETUP.md`)
@@ -15,8 +15,7 @@ The application is deployed as:
 
 ```
 Heroku Apps:
-├── billetera-backend     (Express API server on Node.js buildpack)
-└── billetera-frontend    (React SPA on Node.js static buildpack)
+└── billetera-frontend    (React SPA served via "npm start" → serve -s build)
 
 AWS Resources:
 ├── DynamoDB (users, transactions, categories, refreshTokens tables)
@@ -25,25 +24,198 @@ AWS Resources:
 └── CloudWatch (logging)
 ```
 
-## Backend Deployment
+> The backend is currently deployed separately (e.g. Heroku or another host). This guide focuses on the frontend app, which is what is configured in this repo.
 
-### 1. Create Heroku App
+---
+
+## Git Remotes
+
+This repo uses a **monorepo layout** — the frontend lives under `src/frontend/`, not at the root. Heroku expects to find a deployable app at the repo root, so we use `git subtree` to push only the subdirectory.
+
+The Heroku remote for the frontend is named `heroku-frontend`:
 
 ```bash
-# Login to Heroku
-heroku login
+# Verify your remotes
+git remote -v
 
-# Create backend app
-heroku create billetera-backend
-
-# View app URL
-heroku info billetera-backend
+# Expected output:
+# heroku-frontend  https://git.heroku.com/billetera-frontend.git (fetch)
+# heroku-frontend  https://git.heroku.com/billetera-frontend.git (push)
+# origin           git@github.com:cesarorozcom/digital-wallet.git (fetch)
+# origin           git@github.com:cesarorozcom/digital-wallet.git (push)
 ```
 
-### 2. Configure Environment Variables
+If `heroku-frontend` is missing, add it:
 
 ```bash
-# Set environment variables
+heroku git:remote -a billetera-frontend
+git remote rename heroku heroku-frontend
+```
+
+---
+
+## Frontend Deployment
+
+### How the app is served on Heroku
+
+The `src/frontend/Procfile` contains:
+
+```
+web: npm start
+```
+
+And `package.json` has:
+
+```json
+"scripts": {
+  "start": "serve -s build -l $PORT"
+}
+```
+
+So Heroku runs `npm start`, which uses the `serve` package to serve the pre-built React static files. The `build/` folder must be committed or built during the release — see the deploy steps below.
+
+### 1. Build the frontend locally
+
+```bash
+cd src/frontend
+npm run build
+```
+
+This creates `src/frontend/build/`. Commit it if you want Heroku to use it directly:
+
+```bash
+cd ../..
+git add src/frontend/build
+git commit -m "chore: update frontend build"
+```
+
+### 2. Configure Heroku environment variables
+
+```bash
+heroku config:set -a billetera-frontend \
+  REACT_APP_API_URL=https://billetera-backend.herokuapp.com/api \
+  REACT_APP_TOKEN_STORAGE=localStorage \
+  REACT_APP_ENABLE_OFFLINE_MODE=false
+
+# Verify
+heroku config -a billetera-frontend
+```
+
+### 3. Deploy to Heroku
+
+Because the frontend is a subdirectory of the monorepo, a plain `git push` won't work. Use the subtree split approach — this is the command that has proven to work reliably:
+
+```bash
+git push heroku-frontend `git subtree split --prefix src/frontend master`:master --force
+```
+
+Breaking that down:
+- `git subtree split --prefix src/frontend master` — creates a temporary branch containing only the `src/frontend/` subtree
+- `:master` — pushes it to the `master` branch on Heroku (Heroku deploys from `master`)
+- `--force` — needed when the Heroku branch has diverged (common after squash merges or rebases)
+
+### 4. Watch the build logs
+
+```bash
+heroku logs -a billetera-frontend --tail
+```
+
+You should see the buildpack install dependencies and then the dyno start with `serve`.
+
+### 5. Verify the deployment
+
+```bash
+# Open the app
+heroku open -a billetera-frontend
+
+# Or hit it directly
+curl https://billetera-frontend.herokuapp.com
+```
+
+---
+
+## Troubleshooting
+
+### "Everything up to date" but changes aren't live
+
+This means git thinks the ref is already pushed. Use the force-push split command:
+
+```bash
+git push heroku-frontend `git subtree split --prefix src/frontend master`:master --force
+```
+
+### Subtree push rejects or diverges
+
+The `git subtree push` variant can fail with conflicts if the Heroku branch and local history have diverged. The `subtree split` + force push bypasses this entirely and is the preferred approach:
+
+```bash
+# This is more reliable than:
+# git subtree push --prefix src/frontend heroku-frontend master
+
+# Use this instead:
+git push heroku-frontend `git subtree split --prefix src/frontend master`:master --force
+```
+
+### "No web process running" / H14 error
+
+The dyno isn't scaled. Scale it up:
+
+```bash
+heroku ps:scale web=1 -a billetera-frontend
+```
+
+### App crashes on startup (H10)
+
+Check the logs first:
+
+```bash
+heroku logs -a billetera-frontend --tail
+```
+
+Common causes:
+- `serve` not installed — run `npm install --save serve` inside `src/frontend`
+- `build/` folder is missing — run `npm run build` and commit or let Heroku build it via a `postinstall` script
+- `PORT` not bound — make sure `start` uses `$PORT`, not a hardcoded port
+
+### CORS errors from the frontend
+
+Update the `CORS_ORIGIN` on the backend to match the Heroku frontend URL:
+
+```bash
+heroku config:set -a billetera-backend \
+  CORS_ORIGIN=https://billetera-frontend.herokuapp.com
+```
+
+### 503 Service Unavailable
+
+```bash
+# Restart the dyno
+heroku dyno:restart -a billetera-frontend
+
+# Check config
+heroku config -a billetera-frontend
+```
+
+---
+
+## Backend Deployment
+
+The backend is an Express app. If you're deploying it to Heroku as well, the pattern is the same — create a separate app and push the `src/backend` subtree.
+
+### Setup
+
+```bash
+# Create the app (first time only)
+heroku create billetera-backend
+
+# Add a remote named heroku-backend
+heroku git:remote -a billetera-backend
+git remote rename heroku heroku-backend
+```
+
+### Configure environment variables
+
+```bash
 heroku config:set -a billetera-backend \
   NODE_ENV=production \
   JWT_SECRET=your-production-secret-key-min-32-chars \
@@ -56,363 +228,70 @@ heroku config:set -a billetera-backend \
   TRANSACTIONS_TABLE=transactions \
   CATEGORIES_TABLE=categories \
   REFRESH_TOKENS_TABLE=refreshTokens
-
-# Verify config
-heroku config -a billetera-backend
 ```
 
-### 3. Create Procfile for Backend
+### Deploy
 
-Create `src/backend/Procfile`:
+```bash
+git push heroku-backend `git subtree split --prefix src/backend master`:master --force
+```
+
+The `src/backend/Procfile` should contain:
 
 ```
 web: npm start
 ```
 
-### 4. Update Backend Package.json
+And `src/backend/package.json` should have `postinstall: npm run build` so Heroku compiles TypeScript during the build phase.
 
-Ensure these scripts exist in `src/backend/package.json`:
-
-```json
-{
-  "scripts": {
-    "build": "tsc",
-    "start": "node dist/server.js",
-    "postinstall": "npm run build"
-  },
-  "engines": {
-    "node": "18.x"
-  }
-}
-```
-
-### 5. Deploy Backend
+### Test the backend
 
 ```bash
-# Add Heroku remote if not already added
-heroku git:remote -a billetera-backend
-
-# Navigate to backend directory
-cd src/backend
-
-# Deploy
-git push heroku master
-
-# View logs
-heroku logs -a billetera-backend --tail
-```
-
-If deploying from monorepo root, you need to specify the subtree:
-
-```bash
-git subtree push --prefix src/backend heroku main
-```
-
-### 6. Test Backend
-
-```bash
-# Health check
 curl https://billetera-backend.herokuapp.com/health
-
-# Register user
-curl -X POST https://billetera-backend.herokuapp.com/api/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@prod.com",
-    "password": "Password123!",
-    "firstName": "Test",
-    "lastName": "Prod"
-  }'
 ```
 
-## Frontend Deployment
+---
 
-### 1. Create Heroku App
+## Post-Deployment Checklist
+
+- [ ] Frontend loads at `https://billetera-frontend.herokuapp.com`
+- [ ] Backend health check returns 200 at `/health`
+- [ ] `CORS_ORIGIN` on backend matches the frontend Heroku URL
+- [ ] `REACT_APP_API_URL` on frontend points to the backend Heroku URL
+- [ ] DynamoDB tables exist and IAM credentials have access
+- [ ] S3 bucket configured with CORS for the frontend origin
+- [ ] Lambda receipt processor deployed and wired to S3 bucket (see `docs/howto-deploy-receiptProcessor-lambda.md`)
+- [ ] Receipt upload flow tested end-to-end
+
+---
+
+## Useful Commands Reference
 
 ```bash
-# Create frontend app
-heroku create billetera-frontend
-
-# View app URL
-heroku info billetera-frontend
-```
-
-### 2. Configure Environment Variables
-
-```bash
-# Set environment variables
-heroku config:set -a billetera-frontend \
-  REACT_APP_API_URL=https://billetera-backend.herokuapp.com/api \
-  REACT_APP_TOKEN_STORAGE=localStorage \
-  REACT_APP_ENABLE_OFFLINE_MODE=false
-```
-
-### 3. Create Procfile for Frontend
-
-Create `src/frontend/Procfile`:
-
-```
-web: npm start
-```
-
-But Heroku will serve static files better with a custom Node.js buildpack. Instead, update `package.json` for production:
-
-```json
-{
-  "scripts": {
-    "start": "serve -s build -l 3000",
-    "build": "react-scripts build"
-  },
-  "devDependencies": {
-    "serve": "^14.0.0"
-  }
-}
-```
-
-### 4. Create Procfile Alternative (Recommended for React)
-
-For better performance with React SPA, create `src/frontend/server.js`:
-
-```javascript
-const express = require('express');
-const path = require('path');
-const app = express();
-
-app.use(express.static(path.join(__dirname, 'build')));
-
-app.get('*', (req, res) => {
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
-});
-
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Frontend server running on port ${PORT}`);
-});
-```
-
-Then update `src/frontend/package.json`:
-
-```json
-{
-  "scripts": {
-    "start": "node server.js",
-    "build": "react-scripts build",
-    "dev": "react-scripts start"
-  },
-  "devDependencies": {
-    "express": "^4.18.2"
-  }
-}
-```
-
-### 5. Deploy Frontend
-
-```bash
-# Navigate to frontend directory
-cd src/frontend
-
-# Create and push to Heroku
-git push heroku main
-
-# Or from monorepo root
-git subtree push --prefix src/frontend heroku main
-
-# View logs
-heroku logs -a billetera-frontend --tail
-```
-
-## Post-Deployment Verification
-
-### 1. Check App Status
-
-```bash
-# Backend status
-heroku status -a billetera-backend
-
-# Frontend status
-heroku status -a billetera-frontend
-
-# View logs
-heroku logs -a billetera-backend
-heroku logs -a billetera-frontend
-```
-
-### 2. Test Registration Flow
-
-1. Visit `https://billetera-frontend.herokuapp.com/register`
-2. Register new account
-3. Verify user created in DynamoDB:
-
-```bash
-aws dynamodb scan --table-name users
-```
-
-### 3. Test Login Flow
-
-1. Navigate to `https://billetera-frontend.herokuapp.com/login`
-2. Login with registered credentials
-3. Verify dashboard loads
-
-### 4. Monitor Performance
-
-```bash
-# View logs in real-time
-heroku logs -a billetera-backend --tail
+# View app logs live
 heroku logs -a billetera-frontend --tail
 
-# Check metrics
-heroku metrics -a billetera-backend
+# View environment variables
+heroku config -a billetera-frontend
+
+# Restart the app
+heroku dyno:restart -a billetera-frontend
+
+# Scale dynos (free tier: web=1)
+heroku ps:scale web=1 -a billetera-frontend
+
+# Open the app in browser
+heroku open -a billetera-frontend
+
+# Run a one-off command on Heroku
+heroku run npm run build -a billetera-frontend
 ```
 
-## Database Considerations
-
-### Scaling DynamoDB
-
-For production traffic, adjust billing mode and capacity:
-
-```bash
-# Switch to provisioned billing
-aws dynamodb update-billing-mode \
-  --table-name users \
-  --billing-mode PROVISIONED
-
-# Increase capacity
-aws dynamodb update-table \
-  --table-name transactions \
-  --provisioned-throughput ReadCapacityUnits=25,WriteCapacityUnits=25
-```
-
-### Backup Strategy
-
-```bash
-# Enable point-in-time recovery
-aws dynamodb update-continuous-backups \
-  --table-name users \
-  --point-in-time-recovery-specification PointInTimeRecoveryEnabled=true
-
-# Create on-demand backup
-aws dynamodb create-backup \
-  --table-name users \
-  --backup-name users-backup-$(date +%Y%m%d)
-```
-
-## CI/CD Pipeline (Optional)
-
-### Using Heroku GitHub Integration
-
-1. Go to Heroku Dashboard
-2. Click app → Deploy tab
-3. Connect to GitHub repository
-4. Enable automatic deploys from main branch
-
-Alternatively, use GitHub Actions:
-
-Create `.github/workflows/deploy.yml`:
-
-```yaml
-name: Deploy to Heroku
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Deploy Backend
-        run: |
-          git subtree push --prefix src/backend heroku main
-        env:
-          HEROKU_API_KEY: ${{ secrets.HEROKU_API_KEY }}
-```
-
-## SSL/HTTPS
-
-Heroku automatically provides SSL certificates. Verify:
-
-```bash
-# Your apps should be accessible at:
-# https://billetera-backend.herokuapp.com
-# https://billetera-frontend.herokuapp.com
-```
-
-Force HTTPS in backend (`src/backend/src/server.ts`):
-
-```typescript
-if (process.env.NODE_ENV === 'production') {
-  app.use((req, res, next) => {
-    if (req.header('x-forwarded-proto') !== 'https') {
-      res.redirect(`https://${req.header('host')}${req.url}`);
-    } else {
-      next();
-    }
-  });
-}
-```
-
-## Troubleshooting
-
-### Build Failed
-
-```bash
-# Check buildpack
-heroku buildpacks -a billetera-backend
-
-# Rebuild
-heroku rebuild -a billetera-backend
-```
-
-### 503 Service Unavailable
-
-- Check logs: `heroku logs -a billetera-backend --tail`
-- Restart dyno: `heroku dyno:restart -a billetera-backend`
-- Check environment variables: `heroku config -a billetera-backend`
-
-### CORS Errors
-
-Update `CORS_ORIGIN` in backend config:
-
-```bash
-heroku config:set -a billetera-backend \
-  CORS_ORIGIN=https://billetera-frontend.herokuapp.com
-```
-
-### Database Connection Errors
-
-Verify AWS credentials and table names:
-
-```bash
-heroku config -a billetera-backend
-aws dynamodb describe-table --table-name users
-```
-
-## Production Checklist
-
-- [ ] Environment variables configured
-- [ ] DynamoDB tables created with TTL on refreshTokens
-- [ ] S3 bucket configured with CORS
-- [ ] CloudWatch log groups created
-- [ ] IAM user has minimal necessary permissions
-- [ ] HTTPS enforced on frontend and backend
-- [ ] Error monitoring configured (optional: Sentry, DataDog)
-- [ ] Database backups enabled
-- [ ] Rate limiting configured (optional)
-- [ ] Health checks working
-- [ ] SSL certificate valid
-
-## Next Steps
-
-1. Monitor application performance in production
-2. Implement Phase 2 features (transaction endpoints, receipt upload)
-3. Set up monitoring and alerting
-4. Configure custom domain (optional)
-5. Implement analytics (optional)
+---
 
 ## References
 
 - [Heroku Node.js Support](https://devcenter.heroku.com/articles/nodejs-support)
-- [Heroku Environment Variables](https://devcenter.heroku.com/articles/config-vars)
-- [Heroku SSL Certificates](https://devcenter.heroku.com/articles/ssl)
-- [Heroku Release Phase](https://devcenter.heroku.com/articles/release-phase)
+- [Heroku Config Vars](https://devcenter.heroku.com/articles/config-vars)
+- [git subtree — Atlassian](https://www.atlassian.com/git/tutorials/git-subtree)
+- [serve package](https://github.com/vercel/serve)
