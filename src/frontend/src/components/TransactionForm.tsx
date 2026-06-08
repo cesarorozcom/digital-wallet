@@ -1,6 +1,25 @@
 import React, { useState } from 'react';
 import { Category, TransactionPayload } from '../services/api';
 
+/**
+ * TransactionForm Component - Manual Transaction Creation Fallback
+ * 
+ * This component provides the fallback UI for creating transactions manually.
+ * It's used when:
+ * - Users want to create transactions without uploading a receipt
+ * - Receipt processing fails or is not available
+ * - Users prefer manual data entry over automated OCR extraction
+ * 
+ * The form allows entry of all required transaction fields:
+ * - Category (required)
+ * - Amount (required) - determines DEPOSIT vs PAYMENT type
+ * - Merchant name (required)
+ * - Transaction date (required) - cannot be in the future
+ * - Optional notes (max 200 chars)
+ * 
+ * Transactions created through this form are set to PENDING status
+ * and become CONFIRMED once validated by the system.
+ */
 interface TransactionFormProps {
   categories: Category[];
   onSubmit: (payload: TransactionPayload) => Promise<void>;
@@ -83,7 +102,15 @@ export function TransactionForm({
 
   return (
     <div className="bg-white rounded-lg shadow p-6">
-      <h3 className="text-lg font-semibold mb-4">Create Transaction</h3>
+      <div className="flex items-center justify-between mb-4">
+        <div>
+          <h3 className="text-lg font-semibold">Create Transaction</h3>
+          <p className="text-sm text-gray-500 mt-1">Manually enter transaction details</p>
+        </div>
+        <div className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">
+          Manual Entry
+        </div>
+      </div>
 
       {error && (
         <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">

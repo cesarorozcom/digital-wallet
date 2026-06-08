@@ -1,16 +1,50 @@
 import React, { useEffect, useState } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { useTransactionContext } from '../context/TransactionContext';
 import { useCategoryContext } from '../context/CategoryContext';
 import { TransactionForm } from '../components/TransactionForm';
 import { TransactionList } from '../components/TransactionList';
-import { TransactionPayload } from '../services/api';
+import { ReceiptUpload } from '../components/ReceiptUpload';
+import { TransactionPayload, transactionService, uploadService } from '../services/api';
+import { imageCompressionService } from '../services/imageCompressionService';
+
+/**
+ * TransactionsPage - Transaction Creation (Upload Receipt or Manual Entry)
+ *
+ * This page allows users to:
+ * - Upload a receipt photo (default tab) which is compressed, uploaded to S3,
+ *   and creates a PENDING transaction for OCR processing.
+ * - Create transactions manually (Manual Entry tab) as a fallback.
+ * - View all transactions for a selected month and category.
+ *
+ * The receipt-upload flow:
+ * 1. User selects/photographs a receipt in the ReceiptUpload component.
+ * 2. handleReceiptUpload is invoked with (file, categoryId, transactionDate).
+ * 3. Image is compressed client-side via imageCompressionService.
+ * 4. A presigned S3 URL is obtained via uploadService.getPresignUrl.
+ * 5. The compressed blob is PUT directly to S3.
+ * 6. A transaction record is created with the S3 key as receiptImageUrl.
+ * 7. The transaction list is refreshed.
+ *
+ * Error handling:
+ * - Errors at any pipeline stage propagate back to ReceiptUpload for display.
+ * - Manual entry is always available via the "Manual Entry" tab.
+ */
+
+type EntryTab = 'upload' | 'manual';
 
 export function TransactionsPage() {
-  const { transactions, isLoading, error, createTransaction, deleteTransaction, refreshTransactions } =
+  const { transactions, 
+          isLoading, 
+          error, 
+          createTransaction, 
+          deleteTransaction, 
+          refreshTransactions,
+          updateTransaction } =
     useTransactionContext();
   const { categories } = useCategoryContext();
 
-  const [showForm, setShowForm] = useState(false);
+  const [activeTab, setActiveTab] = useState<EntryTab>('upload');
   const [selectedMonth, setSelectedMonth] = useState(
     new Date().toISOString().split('T')[0].substring(0, 7),
   );
@@ -25,9 +59,37 @@ export function TransactionsPage() {
     setIsCreating(true);
     try {
       await createTransaction(payload);
-      setShowForm(false);
+      setActiveTab('upload');
       setIsCreating(false);
     } catch (err) {
+      setIsCreating(false);
+    }
+  };
+
+  const handleReceiptUpload = async (
+    file: File,
+    categoryId: string,
+    transactionDate: string,
+  ): Promise<void> => {
+    setIsCreating(true);
+    try {
+      const compressed = await imageCompressionService.compressImage(file);
+      const transactionId = uuidv4();
+      const { url, key } = await uploadService.getPresignUrl(
+        file.name,
+        'image/jpeg',
+        transactionId,
+      );
+      await uploadService.uploadToS3(url, compressed.blob, 'image/jpeg');
+      await transactionService.create({
+        categoryId,
+        amount: 1,
+        merchantName: 'Pending Review',
+        receiptImageUrl: key,
+        transactionDate: new Date(transactionDate).toISOString(),
+      });
+      await refreshTransactions(selectedMonth, selectedCategory || undefined);
+    } finally {
       setIsCreating(false);
     }
   };
@@ -49,6 +111,15 @@ export function TransactionsPage() {
     return tx.transactionMonth === selectedMonth;
   });
 
+  const handleUpdateTransaction = async (transactionId: string) => {
+    try {
+      await updateTransaction(transactionId, { status: 'CONFIRMED' });
+    } catch (err: any) {
+      alert(err.message || 'Failed to update transaction');
+    }
+
+  };
+
   const totalDeposits = filteredTransactions
     .filter((tx) => tx.type === 'DEPOSIT' && tx.status === 'CONFIRMED')
     .reduce((sum, tx) => sum + tx.amount, 0);
@@ -63,28 +134,58 @@ export function TransactionsPage() {
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Transactions</h1>
-          <button
-            onClick={() => setShowForm(!showForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md font-medium hover:bg-blue-700 transition-colors"
-          >
-            {showForm ? 'Cancel' : 'New Transaction'}
-          </button>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md text-red-700">
-            {error}
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-md">
+            <p className="text-red-700 font-medium">{error}</p>
+            <p className="text-red-600 text-sm mt-2">
+              You can still create a transaction manually using the Manual Entry tab.
+            </p>
           </div>
         )}
 
-        {/* Form Section */}
-        {showForm && (
+        {/* Tab Switcher */}
+        <div className="flex border-b border-gray-200 mb-6">
+          <button
+            onClick={() => setActiveTab('upload')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'upload'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Upload Receipt
+          </button>
+          <button
+            onClick={() => setActiveTab('manual')}
+            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === 'manual'
+                ? 'border-blue-600 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700'
+            }`}
+          >
+            Manual Entry
+          </button>
+        </div>
+
+        {/* Conditional form rendering */}
+        {activeTab === 'upload' && (
+          <div className="mb-8">
+            <ReceiptUpload
+              categories={categories}
+              onUpload={handleReceiptUpload}
+              isLoading={isCreating}
+            />
+          </div>
+        )}
+        {activeTab === 'manual' && (
           <div className="mb-8">
             <TransactionForm
               categories={categories}
               onSubmit={handleCreateTransaction}
-              onCancel={() => setShowForm(false)}
+              onCancel={() => setActiveTab('upload')}
               isLoading={isCreating}
             />
           </div>
