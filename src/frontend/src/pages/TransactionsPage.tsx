@@ -35,14 +35,13 @@ import { imageCompressionService } from '../services/imageCompressionService';
 type EntryTab = 'upload' | 'manual';
 
 export function TransactionsPage() {
-
   const { transactions, 
           isLoading, 
           error, 
           createTransaction, 
           deleteTransaction, 
           refreshTransactions,
-          updateTransaction }= 
+          updateTransaction } =
     useTransactionContext();
   const { categories } = useCategoryContext();
 
