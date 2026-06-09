@@ -42,6 +42,13 @@ export function TransactionsPage() {
           deleteTransaction, 
           refreshTransactions,
           updateTransaction } =
+  const { transactions, 
+          isLoading, 
+          error, 
+          createTransaction, 
+          deleteTransaction, 
+          refreshTransactions,
+          updateTransaction } =
     useTransactionContext();
   const { categories } = useCategoryContext();
 
@@ -61,6 +68,7 @@ export function TransactionsPage() {
     setIsCreating(true);
     try {
       await createTransaction(payload);
+      setActiveTab('upload');
       setActiveTab('upload');
       setIsCreating(false);
     } catch (err) {
