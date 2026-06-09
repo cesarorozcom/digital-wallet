@@ -42,13 +42,6 @@ export function TransactionsPage() {
           deleteTransaction, 
           refreshTransactions,
           updateTransaction } =
-  const { transactions, 
-          isLoading, 
-          error, 
-          createTransaction, 
-          deleteTransaction, 
-          refreshTransactions,
-          updateTransaction } =
     useTransactionContext();
   const { categories } = useCategoryContext();
 
