@@ -27,4 +27,27 @@ router.post('/presign', async (req, res) => {
   }
 });
 
+router.get('/view', async (req, res) => {
+  try {
+    const rawKey = req.query.key as string | undefined;
+    if (!rawKey || rawKey.trim() === '') {
+      return res.status(400).json({ error: 'key required' });
+    }
+
+    // Normalise: strip full s3:// URI down to just the object key.
+    // Stored values may be "s3://bucket-name/path/to/object" — extract only the path.
+    let key = rawKey.trim();
+    const s3UriMatch = key.match(/^s3:\/\/[^/]+\/(.+)$/);
+    if (s3UriMatch) {
+      key = s3UriMatch[1];
+    }
+
+    const url = await s3.getPresignedGetUrl(key);
+    res.json({ url });
+  } catch (err: any) {
+    console.error('Error generating view presign', err);
+    res.status(500).json({ error: 'view_presign_failed' });
+  }
+});
+
 export default router;

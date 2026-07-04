@@ -402,6 +402,17 @@ export const uploadService = {
       throw new Error(`S3 upload failed: ${response.status} ${response.statusText}`);
     }
   },
+
+  async getViewUrl(key: string): Promise<string> {
+    try {
+      const response = await apiClient.get<{ url: string }>('/uploads/view', {
+        params: { key },
+      });
+      return response.data.url;
+    } catch (error) {
+      throw new Error(getErrorMessage(error, 'Failed to get view URL'));
+    }
+  },
 };
 
 export { API_BASE_URL, API_PATH, API_URL, clearSession, getAccessToken, getRefreshTokenId };
