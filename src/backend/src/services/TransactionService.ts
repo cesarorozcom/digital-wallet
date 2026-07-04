@@ -21,6 +21,7 @@ import {
   TransactionType,
   TransactionStatus,
 } from '../models/Transaction';
+import { DetectKeyPhrasesCommand } from '@aws-sdk/client-comprehend';
 
 class TransactionService {
   private tableName = process.env.TRANSACTIONS_TABLE || 'transactions';
@@ -77,8 +78,13 @@ class TransactionService {
     month?: string,
     categoryId?: string,
   ): Promise<Transaction[]> {
-    const items = await DynamoDBService.scan(this.tableName);
 
+    const items = await DynamoDBService.queryIndex(
+      this.tableName,
+      'UserIdCreatedAtIndex',
+      'userId = :user',
+      {':user': userId }
+    );
     let filtered = items
       .filter((item) => item.userId === userId)
       .sort((a, b) => new Date(b.transactionDate).getTime() - new Date(a.transactionDate).getTime()) as Transaction[];

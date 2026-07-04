@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Category, Transaction, UpdateTransactionPayload } from '../services/api';
+import { Category, Transaction, UpdateTransactionPayload, uploadService } from '../services/api';
 
 interface EditTransactionModalProps {
   transaction: Transaction;
@@ -25,6 +25,47 @@ export function EditTransactionModal({
   const [status, setStatus] = useState<Transaction['status']>(transaction.status);
   const [error, setError] = useState('');
   const [isSaving, setIsSaving] = useState(false);
+
+  // Receipt image view URL state
+  const [receiptViewUrl, setReceiptViewUrl] = useState('');
+  const [receiptViewLoading, setReceiptViewLoading] = useState(
+    Boolean(transaction.receiptImageUrl),
+  );
+  const [receiptViewError, setReceiptViewError] = useState('');
+
+  // Load the presigned GET URL once on mount when there is a receipt S3 key
+  useEffect(() => {
+    if (!transaction.receiptImageUrl) return;
+
+    let cancelled = false;
+    setReceiptViewLoading(true);
+    setReceiptViewError('');
+    setReceiptViewUrl('');
+
+    uploadService
+      .getViewUrl(transaction.receiptImageUrl)
+      .then((url) => {
+        if (!cancelled) {
+          setReceiptViewUrl(url);
+        }
+      })
+      .catch((err: unknown) => {
+        if (!cancelled) {
+          setReceiptViewError(
+            err instanceof Error ? err.message : 'Failed to load receipt image',
+          );
+        }
+      })
+      .finally(() => {
+        if (!cancelled) {
+          setReceiptViewLoading(false);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [transaction.receiptImageUrl]);
 
   // Close on Escape key
   useEffect(() => {
@@ -58,8 +99,8 @@ export function EditTransactionModal({
         status,
       } as UpdateTransactionPayload);
       onClose();
-    } catch (err: any) {
-      setError(err.message || 'Failed to save changes');
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : 'Failed to save changes');
     } finally {
       setIsSaving(false);
     }
@@ -187,6 +228,53 @@ export function EditTransactionModal({
             />
             <p className="mt-1 text-xs text-gray-500">{notes.length}/200 characters</p>
           </div>
+
+          {/* Receipt Preview */}
+          {transaction.receiptImageUrl && (
+            <div className="mt-4">
+              <p className="text-sm font-medium text-gray-700 mb-1">Receipt Preview:</p>
+              {receiptViewLoading && (
+                <div className="flex items-center justify-center h-24 border border-gray-200 rounded-md bg-gray-50">
+                  <svg
+                    className="animate-spin h-6 w-6 text-blue-500"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-label="Loading receipt image"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v8H4z"
+                    />
+                  </svg>
+                </div>
+              )}
+              {!receiptViewLoading && receiptViewError && (
+                <div className="p-3 bg-red-50 border border-red-200 rounded text-red-700 text-sm">
+                  {receiptViewError}
+                </div>
+              )}
+              {!receiptViewLoading && !receiptViewError && receiptViewUrl && (
+                <img
+                  src={receiptViewUrl}
+                  alt="Receipt Preview"
+                  className="max-w-full max-h-64 object-contain border border-gray-300 rounded-md"
+                  onError={() =>
+                    setReceiptViewError('Could not load receipt image. It may have expired or been deleted.')
+                  }
+                />
+              )}
+            </div>
+          )}
 
           {/* Actions */}
           <div className="flex gap-3 pt-2 pb-2">
