@@ -106,8 +106,9 @@ export const handler = async (event: any) => {
           }
           if (fieldType === 'TOTAL' && fieldValue) {
             // Remove any dollar signs or commas before parsing
-            const cleanAmount = fieldValue.replace(/[^0-9.-]+/g, ""); 
+            const cleanAmount = fieldValue.replace(/[^0-9,-]+/g, ""); 
             amount = parseFloat(cleanAmount);
+           
             confidenceSum += fieldConfidence;
             confidenceCount++;
           }
@@ -136,7 +137,7 @@ export const handler = async (event: any) => {
           TableName: TRANSACTIONS_TABLE,
           Key: { "transactionId": { S: transactionId } },
           ConditionExpression: "attribute_exists(transactionId)",
-          UpdateExpression: "SET extractedData = :ed, receiptImageUrl = :url, #s = :status, amount = :amt, transactionDate = :dt, #t = :type, merchantName = :merchant, userId = :user",
+          UpdateExpression: "SET extractedData = :ed, receiptImageUrl = :url, #s = :status, amount = :amt, #t = :type, merchantName = :merchant, userId = :user",
           ExpressionAttributeNames: { "#s": "status", "#t": "type" },
           ExpressionAttributeValues: {
             ":ed": { M: {
@@ -149,9 +150,11 @@ export const handler = async (event: any) => {
             ":url": { S: `s3://${bucket}/${key}` },
             ":type": { S: 'PAYMENT' },
             ":user": { S: userId},
-            ":status": { S: confidence >= 90 ? 'PENDING' : 'NEEDS_MANUAL_REVIEW' },
-            ":amt": { N: amount !== null && !isNaN(amount) ? String(amount) : '0' },
-            ":dt": { S: txDate || '' },
+            //  Let CONFIRMED status if confidence is greather than 95%
+            ":status": { S: confidence >= 95 ? 'CONFIRMED' : 'NEEDS_MANUAL_REVIEW' },
+             // Let amount negative for PAYMENT if confidence is greater or equal than 95%
+            ":amt": { N: amount !== null && !isNaN(amount) ? confidence >= 95 ? String(amount * -1): String(amount) : '0' }
+            
           }
         } as any;
 
