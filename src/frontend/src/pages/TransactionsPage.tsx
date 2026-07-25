@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { v4 as uuidv4 } from 'uuid';
+import { useLocation } from 'react-router-dom';
 import { useTransactionContext } from '../context/TransactionContext';
 import { useCategoryContext } from '../context/CategoryContext';
 import { TransactionForm } from '../components/TransactionForm';
@@ -34,7 +35,12 @@ import { imageCompressionService } from '../services/imageCompressionService';
 
 type EntryTab = 'upload' | 'manual';
 
+type TransactionsPageLocationState = {
+  editTransactionId?: string;
+};
+
 export function TransactionsPage() {
+  const location = useLocation();
   const { transactions, 
           isLoading, 
           error, 
@@ -52,6 +58,38 @@ export function TransactionsPage() {
   );
   const [selectedCategory, setSelectedCategory] = useState('');
   const [isCreating, setIsCreating] = useState(false);
+
+  useEffect(() => {
+    const state = location.state as TransactionsPageLocationState | null;
+    const editTransactionId = state?.editTransactionId;
+
+    if (!editTransactionId) {
+      return;
+    }
+
+    let cancelled = false;
+
+    void (async () => {
+      const existing = transactions.find((item) => item.transactionId === editTransactionId);
+
+      if (existing) {
+        if (!cancelled) {
+          setEditingTransaction(existing);
+        }
+        return;
+      }
+
+      const fetched = await transactionService.get(editTransactionId);
+
+      if (!cancelled) {
+        setEditingTransaction(fetched);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [location.state, transactions]);
 
   useEffect(() => {
     void refreshTransactions(selectedMonth, selectedCategory || undefined);
