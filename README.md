@@ -168,6 +168,41 @@ Example: `uploads/user-abc/2025-07/txn-xyz/receipt.jpg`
 
 ---
 
+## Bank statement import workflow
+
+Bank statements are not handled by the receipt pipeline above. For PDF statements, use an asynchronous Textract workflow designed to extract table rows and turn them into movements.
+
+1. User uploads a bank statement PDF from the app.
+2. Frontend requests a presigned S3 URL and uploads the PDF directly to S3.
+3. S3 triggers a statement-import Lambda asynchronously.
+4. Lambda starts an AWS Textract document job for the PDF:
+	- Use `StartDocumentAnalysis` when you need tables and forms.
+	- Use `StartDocumentTextDetection` if you only need raw text.
+	- `AnalyzeExpense` is better for receipts than for bank statements.
+5. Lambda retrieves Textract results and parses statement rows into movements:
+	- booking date
+	- description / merchant
+	- debit / credit amount
+	- balance when available
+6. Lambda maps each row to a transaction payload and stores the extracted rows as `PENDING_REVIEW`.
+7. The user reviews the imported movements in the Transactions page and confirms or edits them before saving.
+
+Recommended PDF key format:
+
+```
+statements/{userId}/{year-month}/{statementId}/{filename}
+```
+
+Example: `statements/user-abc/2025-07/stmt-xyz/bank-statement.pdf`
+
+Notes:
+
+- PDF statements usually need table extraction, not receipt expense extraction.
+- If the statement has multiple pages, Textract must run in asynchronous mode.
+- Keep the parsed rows in a review state until the user confirms them.
+
+---
+
 ## AWS services
 
 | Service | Role |
@@ -175,6 +210,7 @@ Example: `uploads/user-abc/2025-07/txn-xyz/receipt.jpg`
 | DynamoDB | Stores users, transactions, categories, refresh tokens |
 | S3 | Stores receipt images with versioning and AES-256 encryption |
 | Textract | OCR and expense field extraction from receipt images |
+| Textract (PDF statements) | Async document analysis for statement tables and rows |
 | Lambda | Runs `receiptProcessor` on every S3 upload event |
 | CloudWatch | Logs for the API and Lambda with 7-day retention |
 | IAM | Scoped roles for Lambda and the backend application user |
@@ -237,6 +273,7 @@ Tests use Jest. The backend also includes property-based tests via [fast-check](
 | AWS setup | `docs/AWS-SETUP.md` |
 | Heroku deployment | `docs/HEROKU-SETUP.md` |
 | Lambda deployment | `docs/howto-deploy-receiptProcessor-lambda.md` |
+| Bank statement import plan | `docs/bank-statement-import-lambda-plan.md` |
 | API contracts | `contracts/` |
 | Data model | `data-model.md` |
 | Infrastructure | `terraform/README.md` |

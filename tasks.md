@@ -930,3 +930,98 @@ T1.1 (AWS Setup)
  All critical paths have test coverage (>80%)
  API documented with Swagger
  Deployed to production with monitoring
+
+---
+
+## Bank Statement Import (PDF + Textract) - Backend Tasks
+
+**Scope**: Add a dedicated backend flow for importing bank statement PDFs and creating `PENDING_REVIEW` transaction candidates.
+
+### Backend Checklist
+
+- [ ] BSI-001 Create statement presign endpoint in `src/backend/src/routes/uploadRoutes.ts`
+  - Owner: Backend Lead
+  - Estimate: 2h
+  - Depends on: Existing auth middleware and S3 service
+  - Acceptance: `POST /api/uploads/presign-statement` validates `filename` + `contentType=application/pdf` and returns `{ url, key, statementId }`.
+
+- [ ] BSI-002 Add statement S3 key builder in `src/backend/src/services/S3Service.ts`
+  - Owner: Backend Lead
+  - Estimate: 1h
+  - Depends on: BSI-001
+  - Acceptance: New helper builds keys using `statements/{userId}/{year-month}/{statementId}/{filename}`.
+
+- [ ] BSI-003 Register/document new upload route in `src/backend/src/server.ts` and docs
+  - Owner: Backend Lead
+  - Estimate: 0.5h
+  - Depends on: BSI-001
+  - Acceptance: Route appears in `/api/routes` output and backend docs.
+
+- [ ] BSI-004 Create statement import Lambda scaffold in `src/backend/lambda/statementImportProcessor.ts`
+  - Owner: Backend Lead
+  - Estimate: 3h
+  - Depends on: BSI-001, BSI-002
+  - Acceptance: Lambda validates S3 events, ignores non-PDF objects, logs `bucket`, `key`, `statementId`.
+
+- [ ] BSI-005 Implement Textract async start/get flow in `src/backend/lambda/statementImportProcessor.ts`
+  - Owner: Backend Lead
+  - Estimate: 5h
+  - Depends on: BSI-004
+  - Acceptance: Uses `StartDocumentAnalysis` and `GetDocumentAnalysis` to process multi-page PDFs.
+
+- [ ] BSI-006 Implement table-row parser and normalizer in `src/backend/lambda/statementImportProcessor.ts`
+  - Owner: Backend Lead
+  - Estimate: 6h
+  - Depends on: BSI-005
+  - Acceptance: Extracts date, description, debit/credit/balance; debits are negative and credits are positive.
+
+- [ ] BSI-007 Add deduplication strategy for imported rows in `src/backend/lambda/statementImportProcessor.ts`
+  - Owner: Backend Lead
+  - Estimate: 2h
+  - Depends on: BSI-006
+  - Acceptance: Duplicate candidates are skipped using a stable signature (`statementId + date + amount + description`).
+
+- [ ] BSI-008 Persist imported candidates as `PENDING_REVIEW` via `src/backend/src/services/TransactionService.ts`
+  - Owner: Backend Lead
+  - Estimate: 4h
+  - Depends on: BSI-006
+  - Acceptance: Imported movements are visible in transaction queries and can be edited/confirmed.
+
+- [ ] BSI-009 Add transaction source and statement metadata fields in `src/backend/src/models/Transaction.ts`
+  - Owner: Backend Lead
+  - Estimate: 2h
+  - Depends on: BSI-008
+  - Acceptance: Model supports source markers (for example `STATEMENT_IMPORT`) and statement identifiers.
+
+- [ ] BSI-010 Add Terraform resources/policies for statement import in `terraform/main.tf` and `terraform/receipt_processor/main.tf`
+  - Owner: DevOps/Backend Lead
+  - Estimate: 4h
+  - Depends on: BSI-004, BSI-005
+  - Acceptance: Includes S3 trigger (`statements/*.pdf`) and Textract async permissions (`StartDocumentAnalysis`, `GetDocumentAnalysis`).
+
+- [ ] BSI-011 Add backend tests for statement import parser and endpoint validation in `src/backend/tests/`
+  - Owner: Backend Lead
+  - Estimate: 5h
+  - Depends on: BSI-001, BSI-006, BSI-008
+  - Acceptance: Unit tests cover parser edge cases; integration tests cover presign validation and candidate creation.
+
+- [ ] BSI-012 Add operational runbook notes in `README.md` and `docs/bank-statement-import-lambda-plan.md`
+  - Owner: Tech Lead
+  - Estimate: 1.5h
+  - Depends on: BSI-010, BSI-011
+  - Acceptance: Includes failure modes, retry strategy, and log search keys (`statementId`, `jobId`, `key`).
+
+### Execution Order
+
+1. BSI-001 -> BSI-002 -> BSI-003
+2. BSI-004 -> BSI-005 -> BSI-006 -> BSI-007
+3. BSI-008 -> BSI-009
+4. BSI-010
+5. BSI-011
+6. BSI-012
+
+### Milestone Definition
+
+- M1: Upload and trigger path complete (`BSI-001` to `BSI-005`)
+- M2: Parsing and persistence complete (`BSI-006` to `BSI-009`)
+- M3: Infra, tests, and runbook complete (`BSI-010` to `BSI-012`)
